@@ -523,7 +523,32 @@ const check = (name, ok, detail) => {
     }
   }
 
-  // ── ⑬ 汇总 ──
+  // ── ⑬ 学员独立入口文件 ──
+  //   为什么加（2026-11-13）：上面 ⑤ 只能抓「文档 A 引用了文件 B，但 B 不在包里」。
+  //   可这几个文件是【独立入口】—— 学员直接从群里点开、或者双击，
+  //   没有任何别的文档引用它们。哪天从包里丢了，⑤ 发现不了，
+  //   学员只会说「那个说明找不到」。
+  console.log('\n⑬ 学员独立入口文件');
+  {
+    const REQUIRED_DOCS = [
+      { rel: 'xianyu-achun/学员五步上手.html', why: '贴群里的一页纸' },
+      { rel: 'xianyu-achun/发放说明-给学员.md', why: '查阅手册' },
+      { rel: 'xianyu-achun/学员安装-给学员DSH.md', why: 'AI agent 任务书' },
+      { rel: 'xianyu-achun/学员常见错误速查.md', why: '按报错关键词搜的那份' },
+      { rel: 'install-guide.html', why: '包根层图文安装说明' },
+    ];
+    const missingDocs = [];
+    for (const d of REQUIRED_DOCS) {
+      const p = path.join(root, d.rel.split('/').join(path.sep));
+      let ok = false;
+      try { ok = fs.existsSync(p) && fs.statSync(p).size >= 200; } catch (e) { ok = false; }
+      if (!ok) missingDocs.push(path.basename(d.rel));
+    }
+    check('五个学员入口文件都在包里且非空', missingDocs.length === 0,
+      missingDocs.length ? missingDocs.join(', ') : REQUIRED_DOCS.length + ' 个文件');
+  }
+
+  // ── ⑭ 汇总 ──
   const bad = results.filter(r => !r.ok);
   console.log('\n════ 结果 ════');
   console.log('  ' + (results.length - bad.length) + '/' + results.length + ' 通过');
