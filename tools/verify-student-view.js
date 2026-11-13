@@ -140,7 +140,10 @@ const check = (name, ok, detail) => {
   // launcher 崩掉的典型症状：退出码非 0 且没有任何"闲鱼自动化 · 安装"的横幅
   check('install.cmd 正常跑完（没在 launcher 阶段崩）', exitCode === 0 || exitCode === null,
     exitCode === null ? '' : ('退出码 ' + exitCode));
-  check('launcher 横幅打印了', /Xianyu automation - installer/.test(out));
+  // 【第 153 轮改】横幅从英文改成了中文（学员双击看到的第一行）。
+  //   断言跟着改 —— 它的真正用途是「launcher 有没有跑到 echo 那一行」，
+  //   中文横幅同样能证明这一点，而且顺带验了 UTF-8 中文在包里没乱码。
+  check('launcher 横幅打印了', /闲鱼自动化 · 安装器/.test(out));
   check('没出现 cmd 语法错误', !/was unexpected at this time|is not recognized as an internal/i.test(out),
     (/was unexpected at this time/.test(out) ? '出现 "was unexpected at this time" → launcher 里有未转义的括号' : ''));
 
@@ -372,6 +375,8 @@ const check = (name, ok, detail) => {
         'tools/selftest-update.js',
         'tools/regression-check.js',
         'tools/scan-package.js',
+        // 【第 153 轮】打包后手动跑的工具（约 84 秒），管理员手册第六节提到它
+        'tools/smoke-scripts.js',
       ]);
       for (const rel of DOCS) {
         const dp = path.join(root, rel.split('/').join(path.sep));
