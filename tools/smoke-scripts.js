@@ -1,0 +1,132 @@
+#!/usr/bin/env node
+/**
+ * tools/smoke-scripts.js —— 把【学员文档里教的脚本】逐个真跑一遍，找甩英文报错的
+ *
+ * 为什么有它（2026-11-13 第 152 轮）：
+ *   `verify-student-view` ⑦ 组只查「命令里的脚本文件在不在、参数存不存在」，
+ *   `smoke-test` 只跑 healthcheck + publish-one 两个。
+ *   于是「跑起来会炸」这一类漏了三次：
+ *     144 轮  publish-one 缺依赖 → 英文 Cannot find module
+ *     151 轮  update.js 没 .git  → 英文 fatal: not a git repository
+ *     152 轮  scrub-secrets 没 git → 英文 Command failed: git ls-files
+ *              selftest-update 要 git+老板店档案 → ENOENT
+ *   这个脚本把「学员文档里出现过的每个 node 脚本」在【解压出来的包里】跑一遍
+ *   （不带参数，多数会打印用法就退出），把抛英文错的挑出来。
+ *
+ * ⚠️ 它【不会】自动挂进打包流程（要 75 秒，而且个别脚本无参也可能有副作用）。
+ *   用法：加了新的学员命令、或者改了公共库之后，手动跑一次。
+ *
+ * 用法: node tools/smoke-scripts.js [--zip=<路径>]
+ * 退出码: 0 = 没有甩英文报错的；1 = 有
+ */
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const { execFileSync } = require('child_process');
+
+const ROOT = path.join(__dirname, '..');
+const RELEASE = process.env.XY_RELEASE_DIR || path.join(ROOT, '..', '..', 'xianyu-release');
+
+// 明确跳过：无参也【会真动手】的（下架 / 开浏览器 / 真发 / 写样板）
+const SKIP = new Set([
+  'do-offshelf.js',            // 下架商品
+  'publish-one.js',            // 真发（smoke-test 里用 --dry 单独跑）
+  'tools/store-login.js',      // 会开浏览器扫码
+  'tools/publish-group.js',    // 需要方案文件，且会真发
+  'tools/first-publish.js',    // 会真发
+  'tools/preset-export.js',    // --apply 会写样板
+  'tools/install-tasks.js',    // 会注册计划任务
+  'tools/store-ready.js',      // 会自动 start-all 起服务
+  'tools/xxx.js',              // 文档里的占位符
+]);
+
+// 学员文档里出现过的脚本（改手册时同步这里）
+const SCRIPTS = [
+  'ad-cost-breaker.js',
+  'tools/ad-plan-create.js', 'tools/ad-set-bid-budget.js', 'tools/ad-status.js',
+  'tools/ad-window.js', 'tools/dump-store-config.js',
+  'tools/print-paths.js', 'tools/probe-item-sku.js',
+  'tools/scrub-secrets.js', 'tools/selftest-lib.js',
+  'tools/set-ad-hours.js', 'tools/set-item-sku.js',
+  'tools/store-audit.js', 'tools/store-bulk.js',
+  'tools/store-init.js', 'tools/store-list.js', 'tools/store-new.js',
+  'tools/today.js', 'tools/update.js',
+  'tools/utf8-check.js', 'tools/verify-published.js',
+  'tools/ad-review.js', 'tools/list-onsale.js', 'tools/probe-event-dup.js',
+  'tools/probe-mtop-apis.js',
+];
+
+// 英文报错特征（学员看不懂的）
+const ENGLISH = [
+  /Cannot find module/i, /MODULE_NOT_FOUND/, /ENOENT/, /not a git repository/i,
+  /SyntaxError/, /ReferenceError/, /TypeError/, /is not a function/,
+  /Unexpected token/, /Command failed/, /npm ERR!/,
+];
+
+function main() {
+  console.log('');
+  console.log('  ════ 学员文档里的脚本逐个真跑 ════');
+
+  let zip = (process.argv.find((a) => a.startsWith('--zip=')) || '').split('=')[1];
+  if (!zip) {
+    if (!fs.existsSync(RELEASE)) { console.log('  · 发布目录不存在'); return 2; }
+    const zips = fs.readdirSync(RELEASE)
+      .filter((f) => /^xianyu-install-.*\.zip$/.test(f))
+      .map((f) => ({ f, t: fs.statSync(path.join(RELEASE, f)).mtimeMs }))
+      .sort((a, b) => b.t - a.t);
+    if (!zips.length) { console.log('  · 没有 zip'); return 2; }
+    zip = path.join(RELEASE, zips[0].f);
+  }
+  console.log('  ' + path.basename(zip));
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'smoke-scripts-'));
+  try {
+    execFileSync('tar', ['-xf', zip, '-C', tmp], { stdio: 'pipe' });
+    const root = path.join(tmp, fs.readdirSync(tmp)[0]);
+    const achun = path.join(root, 'xianyu-achun');
+
+    const list = SCRIPTS.filter((s) => !SKIP.has(s));
+    console.log('  跑 ' + list.length + ' 个（跳过 ' + SKIP.size + ' 个会真动手的）\n');
+
+    let bad = 0;
+    for (const s of list) {
+      const abs = path.join(achun, s);
+      if (!fs.existsSync(abs)) {
+        console.log('  ❌ ' + s + '  —— 文件不在包里（⑦ 组应该抓到，这里再兜一次）');
+        bad++;
+        continue;
+      }
+      let out = '', code = 0;
+      try {
+        out = execFileSync(process.execPath, [abs],
+          { cwd: achun, encoding: 'utf8', timeout: 60000, stdio: ['ignore', 'pipe', 'pipe'] });
+      } catch (e) {
+        out = String((e.stdout || '') + (e.stderr || ''));
+        code = e.status == null ? -1 : e.status;
+      }
+      const eng = ENGLISH.filter((re) => re.test(out));
+      if (!eng.length) continue;
+      bad++;
+      const first = out.split(/\r?\n/).filter((l) => l.trim()).slice(0, 2).join('  |  ');
+      console.log('  ❌ ' + s + '  (exit ' + code + ')');
+      console.log('       命中: ' + eng.map((e) => e.source).join(', '));
+      console.log('       ' + first.slice(0, 150));
+    }
+
+    console.log('');
+    if (bad) {
+      console.log('  ❌ ' + bad + ' 个会甩英文报错给学员');
+      console.log('     修法：识别出这个分支，给中文说明 + 告诉学员下一步该做什么');
+      console.log('     （参考 144 轮 publish-one、151 轮 update.js、152 轮 scrub-secrets）');
+      console.log('');
+      return 1;
+    }
+    console.log('  ✅ 没有甩英文报错的');
+    console.log('');
+    return 0;
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+process.exit(main());
