@@ -80,7 +80,7 @@ async function probe() {
   const acc = (list || []).find((a) => a.name === NAME);
   if (!acc) {
     log('❌ 账号列表里没有「' + NAME + '」。现有：' + (list || []).map((a) => a.name).join('、'));
-  log('   （账号列表来自中台后台，不在里面就得先去后台加）');
+    log('   （账号列表来自中台后台，不在里面就得先去后台加）');
     process.exit(2);
   }
   const stateFile = path.join(PROFILES, acc.id, 'state.json');
