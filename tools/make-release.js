@@ -233,6 +233,10 @@ function excluded(rel) {
   // 【2026-11-13 加·第十四批】第 134 轮新加的发包工具。它在打包机上把 zip 发到 gh-pages，
   //   学员拿到没有任何用途（里面有 GH_TOKEN / gh-pages 分支名 / 固定仓库路径）。
   /^tools\/publish-package\.js$/,
+  // 【2026-11-13 加·第十五批】第 133 轮加的截图工具。它 require('playwright')，
+  //   而 xianyu-achun 这个仓【没有 package.json】—— 学员机器上装了也跑不起来。
+  //   它是维护者工具（把一页纸截成图贴群用），不该进包。
+  /^tools\/shot-one-pager\.js$/,
   ];
   return rules.some((r) => r.test(f));
 }

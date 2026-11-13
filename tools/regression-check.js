@@ -244,6 +244,23 @@ has('tools/_install-guide.html.js', /先看这个-五步上手/, '106  详细版
     : ok('121  学员文档不再引用已排掉的文件');
 }
 
+// ── 包内不该有 require 第三方模块的脚本 ──
+//   第 135 轮：xianyu-achun 这个仓【没有 package.json】，所以只要某个文件
+//   require('playwright') / require('sharp') 这种，在学员机器上就永远加载不起来。
+//   当时是 tools/shot-one-pager.js（第 133 轮我自己加的截图工具）混进了包。
+//   这条按「规则层面」查：make-release 里必须排掉已知会 require 第三方的脚本。
+{
+  const mk = read('tools/make-release.js');
+  // 直接查「规则源码里有没有这一行」，不要自己拼正则去匹配正则 ——
+  //   第 135 轮第一版就是这样：base 转义一次、\\$ 再转义一次，永远匹配不上，
+  //   结果「规则明明加了」却一直报红。
+  const mustExclude = ['shot-one-pager\\.js', 'publish-package\\.js'];
+  const miss = mustExclude.filter((pat) => !mk.includes('/^tools\\/' + pat));
+  miss.length
+    ? bad('135  会 require 第三方模块的脚本已排掉', '没排: ' + miss.join(', '))
+    : ok('135  会 require 第三方模块的脚本已排掉（2 个）');
+}
+
 console.log('');
 console.log('  ─────────────');
 console.log('  ' + pass + ' 通过 / ' + fail + ' 失败');
