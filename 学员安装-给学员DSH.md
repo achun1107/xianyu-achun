@@ -1,4 +1,4 @@
-﻿# 闲鱼自动化 · 安装任务书
+# 闲鱼自动化 · 安装任务书
 
 > **交给：学员电脑上的 AI agent（DSH）执行。**
 > 这份文件**不含任何密钥**，可以直接转发、截图、丢群里。
@@ -46,8 +46,11 @@
 **先校验再解压**（防下载不完整；哈希以下载页上的为准，别抄聊天记录里的旧值）：
 
 ```powershell
-Get-FileHash .\xianyu-install-<版本>.zip -Algorithm SHA256 | Format-List
-# 与下载页上那串逐字对比；不一致就是没下全，重下一次
+Get-ChildItem .\xianyu-install-*.zip | ForEach-Object {
+  $h = Get-FileHash $_.FullName -Algorithm SHA256
+  "$($h.Hash.ToLower())  $($_.Name)"
+}
+# 与下载页上那串逐字对比（大小写都行）；不一致就是没下全，重下一次
 ```
 
 ### 2.1 自己写 `service.local.json`（包里自带模板）
@@ -63,7 +66,23 @@ copy service.local.json.example ..\xianyu-playwright-service\service.local.json
 node -e "console.log(require('crypto').randomUUID())"
 ```
 
-③ 记事本打开那个文件，把 `<...>` 换成你自己的：
+③ 记事本打开那个文件，改 **`localAccounts` 里那一个对象**（不是外面的 `_说明`）：
+
+```json
+{
+  "_说明": [ ... 五段中文，是给你看的，别动 ... ],
+  "localAccounts": [
+    {
+      "id":       "<上一步生成的那串 UUID>",
+      "name":     "<你的店铺名>",
+      "username": "<可留空>",
+      "password": "<可留空>"
+    }
+  ]
+}
+```
+
+**别把尖括号 `< >` 一起留下** —— `<你的店铺名>` 要改成真名，不是原样保留。
 
 | 字段 | 填什么 |
 |---|---|
