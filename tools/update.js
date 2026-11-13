@@ -118,6 +118,32 @@ function stampName() {
   return 'update-' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
 }
 
+// ── 学员机没有 .git（2026-11-13 第 151 轮修）─────────────────────────────
+//   学员包【不带 .git】（带了就等于把 git 历史和老板的密钥发出去了），
+//   所以「按 git 更新」这条路在学员机上根本不成立。
+//
+//   原来这里没有守卫，学员照着《学员配置手册》1.8 节敲 `node tools/update.js`，
+//   看到的是一坨英文：
+//       ❌ git fetch 失败（网络或凭据）：Command failed: git fetch origin master
+//          fatal: not a git repository (or any of the parent directories): .git
+//   「not a git repository」对学员没有任何意义，只会以为自己装坏了。
+//
+//   --middle（中台）和 --from（指定 zip）不需要 git，放行；
+//   --rollback 读的是本地 _backup，也不需要 git，放行。
+if (!MIDDLE_MODE && !FROM && !ROLLBACK && !fs.existsSync(path.join(ROOT, '.git'))) {
+  die(3, [
+    '这台机器上没法用「按 git 更新」—— 学员包里不带 .git（也不需要带）。',
+    '',
+    '  《学员配置手册》1.8 节那几条 update.js 命令是【开发机】用的。',
+    '',
+    '  学员这边的更新通道还没接好：中台的代码包端点（--middle）尚未就绪，',
+    '  所以现在不能自动更新。这不影响你现在正常用。',
+    '',
+    '  要拿新版本：找管理员要一个新的 xianyu-install-*.zip，解压覆盖即可。',
+    '  你自己的配置（stores/、config.local.json、publish-assets/）不会被覆盖。',
+  ].join('\n'));
+}
+
 // ── --status ──────────────────────────────────────────────────────────────
 if (STATUS) {
   const f = gitOk(['fetch', 'origin', BRANCH]);
@@ -452,7 +478,11 @@ function reportMiddle(ok, version, err) {
 
 // ── 主流程 ────────────────────────────────────────────────────────────────
 (async () => {
-  const hasRemote = gitOk(['remote']).out.length > 0;
+  // ⚠️ 必须同时判 ok：gitOk 失败时 out 里放的是【错误信息】，
+  //   而错误信息也有长度 —— 拿 `.out.length > 0` 判断，没 git 的机器会
+  //   把「fatal: not a git repository」当成「有 remote」，一路走到 fetch 才炸。
+  const remoteRes = gitOk(['remote']);
+  const hasRemote = remoteRes.ok && remoteRes.out.trim().length > 0;
   if (!hasRemote && !FROM && !MIDDLE_MODE) die(3, '这个仓库没有 remote，也没有 --from=<zip url> / --middle，没法更新。');
 
   // ── 中台源（学员机的正路）──

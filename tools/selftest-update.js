@@ -202,6 +202,24 @@ try {
   if (sha(studentArgs) !== brokenSha) ok('回滚把备份文件还原了');
   else no('回滚没起作用');
 
+  // ── 9. 真实学员包不带 .git ──
+  //   2026-11-13 第 151 轮：上面 1-8 模拟的「学员机」是 `git clone` 出来的（有 .git），
+  //   但真实发出去的包【不含 .git】—— make-release 的规则第 ③ 条就是排掉它
+  //   （带了等于把 git 历史和内部密钥发出去）。
+  //   于是这个测试一直没覆盖到真学员：他们照《学员配置手册》1.8 敲 `node tools/update.js`，
+  //   看到的是「fatal: not a git repository」—— 一句学员完全看不懂的英文。
+  //   这条把 .git 摘掉，验 update.js 给的是中文说明、退出码 3，而不是英文报错。
+  say('9. 学员包不带 .git（真实发出去的包就是这样）');
+  fs.rmSync(path.join(T, 'student', '.git'), { recursive: true, force: true });
+  const noGit = run([]);
+  if (noGit.code === 3 && /学员包里不带 \.git/.test(noGit.out)) ok('默认命令给出中文说明（退出码 3）');
+  else no('默认命令的提示不对：code=' + noGit.code + '  首行=' + String(noGit.out).split('\n')[0]);
+  if (!/not a git repository/.test(noGit.out)) ok('没把 "not a git repository" 甩给学员');
+  else no('还是把英文 git 报错甩给学员了');
+  const noGitStatus = run(['--status']);
+  if (noGitStatus.code === 3 && /学员包里不带 \.git/.test(noGitStatus.out)) ok('--status 也给出中文说明');
+  else no('--status 的提示不对：code=' + noGitStatus.code + '  首行=' + String(noGitStatus.out).split('\n')[0]);
+
   console.log('\n════════════════════════');
   console.log(FAIL ? '⛔ 通过 ' + PASS + ' 项，失败 ' + FAIL + ' 项' : '🎉 全部 ' + PASS + ' 项通过');
 } catch (e) {
