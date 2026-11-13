@@ -289,6 +289,99 @@ const check = (name, ok, detail) => {
     check('guide 里的 --参数脚本都认', flagProblems.length === 0,
       flagProblems.length ? flagProblems.slice(0, 3).join(' | ') : cmds.length + ' 条命令');
 
+  // ⑦之二 全部学员文档里的参数，脚本到底认不认
+  //   为什么加（2026-11-13 第 155 轮）：上面④只查了 install-guide.html，
+  //   而学员文档一共有 9 份、100+ 条命令。第 154 轮就是从这个缝里漏出去的：
+  //     《学员配置手册》L81 教 `install.cmd -InstallCode=XY-XXXX-XXXX`
+  //     但包根的 install.cmd 【不转发参数】（没有 %*），-InstallCode 被静默丢掉；
+  //     更狠的是 `install.cmd -DryRun` 会照样跑【正式安装】。
+  //   那次是靠读手册偶然发现的，这次把它变成检查。
+  //
+  //   和④的区别（两处都得查，缺一不可）：
+  //     ④   只查 install-guide.html、只查 `node xxx.js --flag`
+  //     ⑦之二 查 9 份文档全文，另外查 `install.cmd -Xxx` / `install.ps1 -Xxx`
+  //           —— 这两种常写在【行内反引号】里，不在代码块里，④ 的提取方式抓不到。
+  console.log('\n⑦之二 全部学员文档里的参数');
+  {
+    const DOCS_ALL = [
+      'install-guide.html',
+      '真机首装验证清单.md',
+      '发放说明-给学员.md',
+      '管理员手册-分发包维护.md',
+      '学员安装-给学员DSH.md',
+      '学员常见错误速查.md',
+      '学员配置手册.md',
+      '先看这个-五步上手.html',
+      '给学员的一页说明.md',
+    ];
+    const probs = [];
+    let n = 0;
+
+    // ── A) install.cmd / install.ps1 的参数（全文扫，行内代码也算）──
+    for (const rel of DOCS_ALL) {
+      const p = path.join(achun, rel);
+      if (!fs.existsSync(p)) continue;
+      let t;
+      try { t = fs.readFileSync(p, 'utf8'); } catch (e) { continue; }
+      for (const m of t.matchAll(/(?:\.\\)?(install\.(?:cmd|ps1))\s+(-{1,2}[A-Za-z][\w-]*)/gi)) {
+        n++;
+        const which = m[1].toLowerCase();
+        const flag = m[2];
+        if (which === 'install.cmd') {
+          const cp = path.join(root, 'install.cmd');
+          if (!fs.existsSync(cp)) { probs.push(rel + ': 包根 install.cmd 不在'); continue; }
+          const cs = fs.readFileSync(cp, 'utf8');
+          const knownCmd = new Set([...cs.matchAll(/(-{1,2}[A-Za-z][\w-]*)/g)].map((x) => x[1]));
+          // 要么自己认这个参数，要么把 %* 转发给 install.ps1
+          if (!knownCmd.has(flag) && !/%\*/.test(cs)) {
+            probs.push(rel + ': install.cmd 不转发也不认 ' + flag);
+          }
+        } else {
+          const pp = path.join(achun, 'install.ps1');
+          if (!fs.existsSync(pp)) { probs.push(rel + ': install.ps1 不在'); continue; }
+          const ps = fs.readFileSync(pp, 'utf8');
+          const name = flag.replace(/^-+/, '');
+          if (!new RegExp('\\$' + name + '\\b').test(ps)) {
+            probs.push(rel + ': install.ps1 没有参数 ' + flag);
+          }
+        }
+      }
+    }
+    check('install.cmd / install.ps1 的参数都认', probs.length === 0,
+      probs.length ? [...new Set(probs)].slice(0, 3).join(' | ') : n + ' 处');
+
+    // ── B) node xxx.js --flag（9 份文档的代码块，不止 guide）──
+    const probs2 = [];
+    let n2 = 0;
+    for (const rel of DOCS_ALL) {
+      const p = path.join(achun, rel);
+      if (!fs.existsSync(p)) continue;
+      let t;
+      try { t = fs.readFileSync(p, 'utf8'); } catch (e) { continue; }
+      const blocks = p.endsWith('.html')
+        ? [...t.matchAll(/<pre><code>([\s\S]*?)<\/code><\/pre>/g)].map((x) => x[1])
+        : [...t.matchAll(/```[a-z]*\r?\n([\s\S]*?)```/g)].map((x) => x[1]);
+      for (const b of blocks) {
+        for (const raw of b.split(/\r?\n/)) {
+          const m = raw.trim().match(/^node\s+((?:tools[\\/])?[\w.-]+\.js)\s+(.+)$/);
+          if (!m) continue;
+          n2++;
+          const script = m[1].replace(/\\/g, '/');
+          const sp = path.join(achun, script);
+          if (!fs.existsSync(sp)) continue;          // 文件缺失由⑦组报
+          const src = fs.readFileSync(sp, 'utf8');
+          const known = new Set([...src.matchAll(/(--[a-z][a-z0-9-]*)/g)].map((x) => x[1]));
+          const rest = m[2].split('`')[0];            // 行内代码后面可能跟散文
+          for (const u of [...rest.matchAll(/(--[a-z][a-z0-9-]*)/g)].map((x) => x[1])) {
+            if (!known.has(u)) probs2.push(rel + ': ' + script + ' 没有 ' + u);
+          }
+        }
+      }
+    }
+    check('9 份文档代码块里的 --参数脚本都认', probs2.length === 0,
+      probs2.length ? [...new Set(probs2)].slice(0, 3).join(' | ') : n2 + ' 条命令');
+  }
+
     // ⑤ 学员文档里点名的文件，包里必须真的有
     //   为什么加（2026-11-13）：install-guide.html 里写着「包里 xianyu-achun\\学员常见错误速查.md」，
     //   但那个文件【从未被 git 跟踪】—— make-release 从 git ls-files 打包，自然就没有它。
