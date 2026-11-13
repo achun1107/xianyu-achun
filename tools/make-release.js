@@ -152,6 +152,31 @@ function excluded(rel) {
   //   「待办-等登录后执行.md」—— 我自己的 TODO，和学员无关
   //   「标价对照表-14明星.md」—— 168 条同行代拍商品的实测标价（2026-09-21 抓取），业务机密
   /^(待办-|标价对照表-)/,
+  // 【2026-11-13 加·第七批】根层那一堆【业务抓取数据】。
+  //   第 112 轮扫 .json 发现根层有 248 个，1491 KB，绝大多数是我从闲鱼后台 dump 下来的：
+  //     ad-*.json   112 个 —— 广告后台（真实花费 / 余额 / 点击成本 / 擦亮中计划）
+  //     xy-*.json    30 个 —— 扫店/竞品汇总（xy-competitor-summary 45 KB）
+  //     items-*.json 12 个 —— 商品列表快照
+  //     damai-*.json      —— 大麦在架数据
+  //   这些是【老板的经营数据】，发给学员既没用又泄露。
+  //
+  //   ⚠️ 必须限定根层（^）。子目录里的同名要留：
+  //      lib/config.json（运行时配置）/ presets/*（建店预设）/
+  //      stores/_template.json（建店模板）/ package.json
+  /^(ad|xy|items|item|damai|plans?|verify|consol|raise150|half|ab|all-items|提到150)[-_.][\w.\u4e00-\u9fa5-]*\.json$/,
+  /^(item-data|items-want|xy-[\w-]+|ad-[\w-]+|all-items\d*)\.json$/,
+  // 【2026-11-13 加·第八批】剩下的几个业务数据文件。
+  //   onsale.json         —— 在售商品快照（真实 itemId + 标题 + 销量）
+  //   my-plans.json       —— 广告计划全字段
+  //   AD-EXCLUDE.json     —— 排除名单，里面写着老板的原话指令
+  //   shows-hold.json     —— 暂存任务（含真实商品标题）
+  //   publish-schedule.json —— 10-11 的上架排期（老板的原话也在里面）
+  //   webkubor-baseline.json —— GitHub 仓库基线，和闲鱼完全无关
+  //   poster-templates.backup_*.json —— 备份文件
+  //   console-out-*.json  —— 控制台抓取输出
+  //   ⚠️ 检查过：publish-one.js 里提到 publish-schedule.js 只是【注释】，
+  //      不是真的读那个 json，排掉不会让发布链报错。
+  /^(my-plans|onsale|AD-EXCLUDE|webkubor-baseline|shows-hold|publish-schedule|combined|console-out-[\d]+|poster-templates\.backup_[\w]+|待删除清单-)/,
   ];
   return rules.some((r) => r.test(f));
 }
