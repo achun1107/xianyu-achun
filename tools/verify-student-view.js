@@ -144,6 +144,12 @@ const check = (name, ok, detail) => {
   //   断言跟着改 —— 它的真正用途是「launcher 有没有跑到 echo 那一行」，
   //   中文横幅同样能证明这一点，而且顺带验了 UTF-8 中文在包里没乱码。
   check('launcher 横幅打印了', /闲鱼自动化 · 安装器/.test(out));
+  // 【第 154 轮加】上面传的是 -DryRun，那就【只该预演】。
+  //   原来的 launcher 不转发参数（没有 %*），-DryRun 被静默丢掉，
+  //   于是「install.cmd -DryRun」会把【正式安装】也跑了 —— 想预演的人被真装。
+  //   现在带参数走 :withargs 单步转发，这条断言守着它别再退回去。
+  check('install.cmd -DryRun 只预演（参数有被转发）', !/第 2\/2 步：正式安装/.test(out),
+    /第 2\/2 步：正式安装/.test(out) ? '带 -DryRun 却跑了正式安装 → 参数没转发' : '');
   check('没出现 cmd 语法错误', !/was unexpected at this time|is not recognized as an internal/i.test(out),
     (/was unexpected at this time/.test(out) ? '出现 "was unexpected at this time" → launcher 里有未转义的括号' : ''));
 
