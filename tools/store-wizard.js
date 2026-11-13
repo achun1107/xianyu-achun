@@ -136,7 +136,28 @@ function sh(script, args, env) {
     fs.mkdirSync(outDir, { recursive: true });
     const outFile = path.join(outDir, 'base-' + styleKey + '.jpg');
     try {
-      const out = execFileSync(process.execPath, [MUSEAV_CLI, 'gen', '-p', STYLES[styleKey].prompt, '-r', '3:4'], { encoding: 'utf8', timeout: 600000 });
+      // 【2026-11-13 改】museav CLI 出图时会往 stderr 反复打「生成中...」，实测一次跑下来
+      //   刷了将近 30 行，中间还有几十秒没别的输出 —— 学员看到这个会以为卡死了，
+      //   而真正该看的信息（"约 25-40 秒"）被顶上去了。
+      //   把 stderr 也捕获起来，改成一个每 3 秒动一下的进度点；失败时再把原始输出打出来（排查用）。
+      process.stdout.write('   出图中 ');
+      const dot = setInterval(() => process.stdout.write('.'), 3000);
+      let out;
+      let genErr = '';
+      try {
+        out = execFileSync(process.execPath, [MUSEAV_CLI, 'gen', '-p', STYLES[styleKey].prompt, '-r', '3:4'],
+          { encoding: 'utf8', timeout: 600000, stdio: ['pipe', 'pipe', 'pipe'] });
+      } catch (e1) {
+        genErr = String((e1 && (e1.stderr || e1.message)) || '');
+        throw e1;
+      } finally {
+        clearInterval(dot);
+        process.stdout.write('\n');
+        if (genErr) {
+          console.log('   museav 原始输出（排查用）：');
+          genErr.split(/\r?\n/).slice(-8).forEach((l) => console.log('     ' + l));
+        }
+      }
       const m = String(out).match(/https:\/\/\S+\.(png|jpg|jpeg|webp)/i);
       if (!m) throw new Error('没拿到图片 URL');
       const http = require(m[0].startsWith('https') ? 'https' : 'http');
