@@ -341,6 +341,12 @@ const check = (name, ok, detail) => {
         'xianyu-achun/管理员手册-分发包维护.md',
         'xianyu-achun/学员安装-给学员DSH.md',
         'xianyu-achun/学员常见错误速查.md',
+        // 【2026-11-13 加】学员配置手册 600 行、25 条命令，是最大的学员文档，
+        //   之前没进这个名单（第 115 轮手工验过一次全对，现在让它自动验）。
+        'xianyu-achun/学员配置手册.md',
+        // 一页纸和它的 md 版
+        'xianyu-achun/先看这个-五步上手.html',
+        'xianyu-achun/给学员的一页说明.md',
       ];
       const badCmds = [];
       let cmdCount = 0;

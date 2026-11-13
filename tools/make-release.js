@@ -55,6 +55,11 @@ function excluded(rel) {
   //     · 包里 verify-student-view 的⑨组 execFileSync 调它 → ENOENT
   //   这和 install.cmd 那次是同一类错：多个环节各有一套排除规则，改一个不够。
   if (f === 'tools/_syntax-check-all.js') return false;             // 例外：自检要用
+  // 【2026-11-13 第 116 轮加】ad-cost-breaker.js 是【广告花费熔断器】，
+  //   每 30 分钟跑一次，学员配置手册里明确让学员用 `node ad-cost-breaker.js --dry` 预演。
+  //   底下那条 /^ad-[\w-]+\.js$/ 把它一起排了 —— 自检 ⑦ 组抓到的（「缺 ad-cost-breaker.js」）。
+  //   根层 39 个 ad-*.js 里只有它一个是给员工用的，其余 38 个都是老板的一次性脚本。
+  if (f === 'ad-cost-breaker.js') return false;                      // 例外：学员手册要用
   const rules = [
     /^stores\//,                    // 老板各店的档案（含价格策略、素材路径）
     /^publish-assets\//,            // 85MB 素材，学员自己出
@@ -201,6 +206,11 @@ function excluded(rel) {
   //   第 113 轮 scan-package 扫出来 ad-stop-two.js（8 处真实 itemId）、
   //   ad-stop-shows.js（7 处）还在包里。这些是"停某几个计划"的专用脚本，
   //   里面写死了老板的 itemId，学员双击/运行只会报错。
+  //
+  //   ⚠️【2026-11-13 第 116 轮修】这条规则误伤了 ad-cost-breaker.js ——
+  //      它是【广告花费熔断器】，每 30 分钟跑一次，学员配置手册里明确让学员
+  //      用 `node ad-cost-breaker.js --dry` 做熔断预演。自检 ⑦ 组抓到的（缺 ad-cost-breaker.js）。
+  //      根层 39 个 ad-*.js 里只有它一个是给员工用的，其余 38 个都是老板的一次性脚本。
   /^ad-[\w-]+\.js$/,
   /^(pause|resume|stop|start)-[\w-]+\.js$/,
   // 【2026-11-13 加·第十二批】打包工具本身。第 114 轮扫 tools\ 时发现它还在包里：
