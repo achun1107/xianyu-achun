@@ -14,8 +14,8 @@
  *   稳妥做法就是先导航到编辑页再调。
  *
  * 用法:
- *   node tools/probe-item-sku.js --store="好易美票务Hope" --ids=1088881826804
- *   node tools/probe-item-sku.js --store="好易美代拍" --ids=1085400873025,1089912993365 --raw
+ *   node tools/probe-item-sku.js --store="<你的店铺名>" --ids=<itemId>
+ *   node tools/probe-item-sku.js --store="<你的店铺名>" --ids=<id1>,<id2>raw
  */
 const { post } = require('../lib/http');
 const args = require('../lib/args');

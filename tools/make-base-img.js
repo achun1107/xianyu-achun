@@ -19,7 +19,7 @@
  *   明星、卖点三层字，底图自己带字就会糊成一团。所以 prompt 里固定压 no text。
  *
  * 用法:
- *   node tools/make-base-img.js --store="超能水手代拍" --style=gold
+ *   node tools/make-base-img.js --store="<你的店铺名>" --style=gold
  *   node tools/make-base-img.js --store="XX" --style=custom --prompt="dark blue stage, silver confetti, cinematic"
  *   node tools/make-base-img.js --list                       # 看有哪些风格预设
  *   node tools/make-base-img.js --store="XX" --style=gold --dry   # 只生成不写档案

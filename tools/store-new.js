@@ -106,7 +106,10 @@ function retagProvenance(o, note) {
     if (accounts) {
       const free = accounts.filter((a) => !used[a.id]);
       console.log('\n可用账号 ' + free.length + ' 个。开新店：');
-      for (const a of free) console.log('  node tools/store-new.js --name="' + a.name + '" --from="好易美票务Hope"');
+      // 【2026-11-13 第 143 轮修】原来这里 --from 硬编码了 "好易美票务Hope"——
+      //   学员跑 --list-accounts 会看到这条提示，照抄必然失败（他没有那个店）。
+      //   改用包里自带的样板。
+      for (const a of free) console.log('  node tools/store-new.js --name="' + a.name + '" --preset=代拍-标准 --copy-sub');
     }
     return;
   }
