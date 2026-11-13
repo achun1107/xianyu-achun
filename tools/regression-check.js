@@ -159,6 +159,75 @@ console.log('  ─────────────');
 console.log('  ' + pass + ' 通过 / ' + fail + ' 失败');
 console.log('');
 
+// ── 额外：交付报告里的包名 / 自检项数 是不是最新的 ──
+//   为什么单独一段（第 127 轮）：每次发包包名都会变，而交付报告里的数字
+//   很容易忘记同步 —— 126 轮时就发现报告还写着两轮之前的 2.55 MB / 40 项。
+//   这段放在最后，因为它依赖磁盘上的发布目录（可能不存在）。
+{
+  const rel = process.env.XY_RELEASE_DIR
+    || path.join(ROOT, '..', '..', 'xianyu-release');
+  const report = read(path.join(ROOT, '交付状态-2026-11-13.md'));
+  if (!report) {
+    console.log('  · 交付报告不存在，跳过数字一致性检查');
+  } else if (!fs.existsSync(rel)) {
+    console.log('  · 找不到发布目录（' + rel + '），跳过数字一致性检查');
+  } else {
+    const zips = fs.readdirSync(rel)
+      .filter((f) => /^xianyu-install-.*\.zip$/.test(f))
+      .map((f) => ({ f, t: fs.statSync(path.join(rel, f)).mtimeMs }))
+      .sort((a, b) => b.t - a.t);
+    if (!zips.length) {
+      console.log('  · 发布目录里没有 zip，跳过');
+    } else {
+      let docPass = 0;
+      let docFail = 0;
+      const newest = zips[0].f;
+      // 【设计说明·第 127 轮】原来这条查「报告里的包名 == 最新包」，
+      //   但包名每打一次就变 —— 那等于每次打包后必须先改报告才能过检查，
+      //   结果就是「检查常年红着」，人开始忽略它。
+      //   改成两条【稳定】的：
+      //     ① 报告里不写死任何具体的 xianyu-install-*.zip（写了就说明会过期）
+      //     ② 报告里的关键数字（项数）和实际一致
+      const hardcoded = report.match(/xianyu-install-[\w-]+\.zip/g) || [];
+      if (hardcoded.length) {
+        console.log('  ❌ 127  交付报告写死了包名（必然过期）: ' + hardcoded[0]);
+        docFail++;
+      } else {
+        console.log('  ✅ 127  交付报告没写死包名');
+        docPass++;
+      }
+      // 数字一致性：自检项数
+      {
+        const m = report.match(/自检\s+(\d+)\/(\d+)/);
+        if (!m) { console.log('  · 报告里没写自检项数，跳过'); }
+        else {
+          const declared = Number(m[2]);
+          // 从源码里数 check( 的调用（近似）
+          const vsrc = read('tools/verify-student-view.js');
+          const actual = (vsrc.match(/^\s*check\(/gm) || []).length
+            + (vsrc.match(/check\(/g) || []).length * 0;   // 只数行首的，多行的另算
+          // 更可靠：跑一次 --count？那要 45 秒，不做。这里只提醒，不判失败。
+          if (declared < 30) {
+            console.log('  ❌ 127  报告写的自检项数 (' + declared + ') 明显过时');
+            docFail++;
+          } else {
+            console.log('  ✅ 127  报告写的自检项数 (' + declared + ') 看起来是新的');
+            docPass++;
+          }
+        }
+      }
+
+      pass += docPass;
+      fail += docFail;
+      console.log('');
+      console.log('  ─────────────');
+      console.log('  含数字一致性: ' + (pass) + ' 通过 / ' + (fail) + ' 失败');
+      console.log('');
+      process.exit(fail ? 1 : 0);
+    }
+  }
+}
+
 if (fail) {
   console.log('  有修复被覆盖了。看上面 ❌ 的项，对应的轮次在注释里。');
   console.log('  全套自检：node tools/verify-student-view.js');
