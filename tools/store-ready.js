@@ -37,7 +37,7 @@ const log = (m) => console.log('[' + new Date().toLocaleTimeString('zh-CN') + ']
         // 2026-11-13 加：agent 被 stop 掉之后（或服务刚重启还没 start-all），
         //   start-one 会返回「请先调用 start-all」—— 学员完全不知道那是什么。
         //   这里自动补一次 start-all 再重试，别让人去看这句话。
-        log('「' + name + '」浏览器还没启动 → 自动启动一次（可能要 10-30 秒）');
+        log('「' + name + '」浏览器还没启动 → 自动启动一次（约 2 分钟，要起 Chromium 再加载闲鱼主站，别关窗口）');
         const sa = await post('/api/agent/start-all', {}, { timeout: 180000 }).catch((e) => ({ ok: false, error: e.message }));
         if (!sa || sa.ok !== true) {
           log('  ❌ 自动启动失败：' + JSON.stringify(sa).slice(0, 140));

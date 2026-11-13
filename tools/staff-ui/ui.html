@@ -492,7 +492,7 @@ function watch(id) {
 async function warmup() {
   const log = document.getElementById('log');
   log.classList.add('on');
-  log.textContent = '正在预热店铺浏览器…';
+  log.textContent = '正在预热店铺浏览器…\n\n浏览器已启动时约 30 秒；如果它刚被停过、要重新起 Chromium，可能要 2 分钟。\n窗口别关，进度会在下面自动刷新。';
   setStatus('<span class="badge run">运行中</span>');
   const d = await apiFetch('/api/warmup', { method: 'POST' });
   watch(d.taskId);
