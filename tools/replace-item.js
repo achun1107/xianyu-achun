@@ -45,6 +45,8 @@ const EVENT = argv[3] || '演唱会';
 const SESSION = argv[4] || '首开';
 const MAIN = GET('main', '');
 const SUBS = GET('subs', '');   // 【2026-11-13 加】整组换副图：目录或逗号分隔的文件列表
+const ADDR_CITY = GET('addr-city', '');   // 【2026-11-13 加】顺带把所在地改到该城市（一次 edit 改全）
+const ADDR_AREA = GET('addr-area', '');
 const MAIN_ONLY = argv.includes('--main-only');   // 只换主图，标题/正文保持线上原样
 const TPL = GET('tpl', '');
 
@@ -226,6 +228,19 @@ if (MAIN) console.log('新主图: ' + MAIN); else console.log('新主图: 不改
   }
   console.log('结构字段原样回填: ' + Object.keys(carry).join(', '));
 
+  // 【2026-11-13 加】--addr-city：顺手把所在地改掉（换成本地场次时用）。
+  //   为什么要并进同一次 edit：一次编辑=一次审核，分两次改会多一轮审核 + 多一次模型往返。
+  let newAddr = null;
+  if (ADDR_CITY) {
+    const AREAS = readJSON(path.join(ROOT, 'lib', 'city-areas.json')) || {};
+    const pool = AREAS[ADDR_CITY] || [];
+    if (!pool.length) { console.log('❌ lib/city-areas.json 里没有「' + ADDR_CITY + '」的区池（已登记：' + Object.keys(AREAS).join(' / ') + '）'); process.exit(1); }
+    const hit = ADDR_AREA ? pool.find((x) => x.area === ADDR_AREA) : pool[0];
+    if (!hit) { console.log('❌「' + ADDR_CITY + '」没有区「' + ADDR_AREA + '」'); process.exit(1); }
+    newAddr = { area: hit.area, city: hit.city, divisionId: hit.divisionId, gps: hit.gps, poiId: '', poiName: '', prov: hit.prov };
+    console.log('所在地: ' + JSON.stringify(cur.addr) + ' → ' + JSON.stringify(newAddr));
+  }
+
   // 【2026-11-13 加·实测踩到】「无规格」老链接改不了。
   //   现象：payload 不带 itemProperties/itemSkuList 时，编辑接口回
   //         FAIL_BIZ_UN_CATCH_EXCEPTION::闲鱼太累啦～请您稍候重试～（1069508800478 实测）
@@ -255,8 +270,7 @@ if (MAIN) console.log('新主图: ' + MAIN); else console.log('新主图: 不改
 
   const codeUpd = `
     var data = {
-      itemId: ${JSON.stringify(ID)},
-      freebies: false, itemTypeStr: 'b', quantity: String(${JSON.stringify(String(cur.quantity || '9999'))}), simpleItem: 'true',
+      itemId: ${JSON.stringify(ID)},      freebies: false, itemTypeStr: 'b', quantity: String(${JSON.stringify(String(cur.quantity || '9999'))}), simpleItem: 'true',
       imageInfoDOList: ${JSON.stringify(imgList)},
       itemTextDTO: { desc: ${JSON.stringify(finalDesc)}, title: ${JSON.stringify(finalTitle)}, titleDescSeparate: false },
       itemPriceDTO: {}, defaultPrice: false,
@@ -272,6 +286,8 @@ if (MAIN) console.log('新主图: ' + MAIN); else console.log('新主图: 不改
     }
     var CARRY = ${JSON.stringify(carry)};
     for (var k in CARRY) { if (CARRY[k] !== undefined && CARRY[k] !== null && data[k] === undefined) data[k] = CARRY[k]; }
+    var ADDR = ${JSON.stringify(newAddr)};
+    if (ADDR) data.itemAddrDTO = ADDR;
     var out = {};
     try {
       var r = await mtop.request({ api: 'mtop.idle.pc.idleitem.edit', v: '1.0', data: data, type: 'POST' });

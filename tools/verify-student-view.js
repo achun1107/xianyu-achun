@@ -376,29 +376,33 @@ const check = (name, ok, detail) => {
   //   achun 是纯 Node 工具集（CommonJS），用 `node -c` 就够。
   console.log('\n⑨ xianyu-achun 的 Node 代码语法');
   {
-    const jsFiles = [];
-    (function rec(d) {
-      for (const name of fs.readdirSync(d)) {
-        if (name === 'node_modules' || name === '.git') continue;
-        const p = path.join(d, name);
-        const st = fs.statSync(p);
-        if (st.isDirectory()) { rec(p); continue; }
-        if (/\.js$/i.test(name)) jsFiles.push(p);
-      }
-    })(achun);
-
-    const bad = [];
-    for (const f of jsFiles) {
+    // 【2026-11-13 优化】原来这里对每个文件启动一次 `node -c`，293 个文件 = 293 次进程启动，
+    //   占掉全部检查时间的一半以上（总耗时 127 秒）。
+    //   改用 _syntax-check-all.js 在单进程里用 vm.Script 解析所有文件：1.3 秒，快 80 倍。
+    let ok = false;
+    let detail = '';
+    try {
+      execFileSync('node', [path.join(__dirname, '_syntax-check-all.js'), '--json', achun],
+        { encoding: 'utf8', timeout: 120000, stdio: 'pipe' });
+      ok = true;
+      detail = '全部通过';
+    } catch (e) {
+      const raw = String(e.stdout || '');
       try {
-        execFileSync('node', ['-c', f], { stdio: 'pipe', timeout: 20000 });
-      } catch (e) {
-        const msg = String((e.stderr || '') + (e.stdout || ''));
-        const first = (msg.split(/\r?\n/).find(l => /Error/.test(l)) || '').trim();
-        bad.push(path.relative(achun, f).replace(/\\/g, '/') + ': ' + first.slice(0, 80));
+        const j = JSON.parse(raw);
+        if (j && Array.isArray(j.bad) && j.bad.length) {
+          detail = j.bad.slice(0, 2)
+            .map((b) => path.basename(b.file) + ': ' + b.err)
+            .join(' | ');
+        } else {
+          detail = '（解析不出错误详情）';
+        }
+      } catch (e2) {
+        detail = raw.split('\n').slice(0, 2).join(' ').slice(0, 120) || '执行失败';
       }
+      ok = false;
     }
-    check('achun 的 js 全部语法正确', bad.length === 0,
-      bad.length ? bad.slice(0, 2).join(' | ') : jsFiles.length + ' 个文件');
+    check('achun 的 js 全部语法正确', ok, ok ? '' : detail);
   }
 
   // ── ⑩ 所有 HTML 里的内联 <script> ──
