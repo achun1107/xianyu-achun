@@ -22,7 +22,8 @@ const fs = require('fs');
 const path = require('path');
 const agent = require('../lib/agent');
 const titleLib = require('../lib/title');
-const { ROOT, readJSON } = require('../lib/env');
+const storeProfile = require('../lib/store-profile');
+const { ROOT, readJSON, STORE: ENV_STORE } = require('../lib/env');
 
 /** agent.mtop 有时代码里 return 的是字符串，有时框架已解析成对象 —— 两种都接 */
 const asObj = (r) => {
@@ -47,14 +48,24 @@ const MAIN_ONLY = argv.includes('--main-only');   // 只换主图，标题/正�
 const TPL = GET('tpl', '');
 
 if (!ID || !CITY || !STAR) {
-  console.log('用法: node tools/replace-item.js <itemId> <城市> <明星> <活动类型> <场次类型> [--main=图] [--tpl=3] [--go]');
+  console.log('用法: node tools/replace-item.js <itemId> <城市> <明星> <活动类型> <场次类型> [--main=图] [--tpl=3] [--store=店名] [--go]');
   process.exit(2);
 }
 
-const STORE = '好易美代拍';
-const T = readJSON(path.join(process.env.USERPROFILE || process.env.HOME, '.xianyu-templates.json'));
-const POOL = (T.storeTemplates || {})[STORE] || T.templates.map(x => x.id);
-const TPLS = T.templates.filter(x => POOL.indexOf(x.id) >= 0);
+// 【2026-11-13 改】原来写死 '好易美代拍' —— 换店时会读到错的模板池，
+//   而且 upload-image 的 store 参数也会传错店（图会落到别家的图床身份下）。
+//   现在：--store=店名 > XY_STORE > lib/config.json 的 store.default。
+const STORE_ARG = GET('store', '');
+const STORE = STORE_ARG || ENV_STORE || '好易美代拍';
+const T = readJSON(path.join(process.env.USERPROFILE || process.env.HOME, '.xianyu-templates.json')) || {};
+// 文案模板池：优先店铺档案的 文案.templateIds（多店唯一真源），
+//   档案没有才退回 ~/.xianyu-templates.json 的 storeTemplates，最后才是全部模板。
+const PROF = (() => { try { return storeProfile.load(STORE); } catch (e) { return {}; } })();
+const PROF_POOL = (PROF.文案 && Array.isArray(PROF.文案.templateIds) && PROF.文案.templateIds.length)
+  ? PROF.文案.templateIds : null;
+const POOL = PROF_POOL || (T.storeTemplates || {})[STORE] || (T.templates || []).map(x => x.id);
+const TPLS = (T.templates || []).filter(x => POOL.indexOf(x.id) >= 0);
+if (!TPLS.length) { console.log('❌ 店铺「' + STORE + '」的文案模板池解析为空：' + JSON.stringify(POOL)); process.exit(1); }
 
 // 选模板：指定优先；否则挑第一条「30 字整、不补！、不硬截断」的
 function buildTitle(cand) {
@@ -93,6 +104,11 @@ if (MAIN_ONLY) {
 if (MAIN) console.log('新主图: ' + MAIN); else console.log('新主图: 不改');
 
 (async () => {
+  // 【2026-11-13 加】显式只启动本店上下文。
+  //   原来靠 evalOnStore 内部的 ready()，而 ready() 开的是 lib/config.json 的 store.active
+  //   （本机是「好易美代拍」）—— 换店时会去等一个跟目标店无关的页面。
+  await agent.ready({ stores: [STORE], timeout: 240000 });
+
   // 1. 读现状
   const codeRead = `
     var r = await mtop.request({ api: 'mtop.idle.pc.idleitem.editdetail', v: '1.0', data: { itemId: ${JSON.stringify(ID)} }, type: 'GET' });
@@ -180,6 +196,33 @@ if (MAIN) console.log('新主图: ' + MAIN); else console.log('新主图: 不改
   }
   console.log('结构字段原样回填: ' + Object.keys(carry).join(', '));
 
+  // 【2026-11-13 加·实测踩到】「无规格」老链接改不了。
+  //   现象：payload 不带 itemProperties/itemSkuList 时，编辑接口回
+  //         FAIL_BIZ_UN_CATCH_EXCEPTION::闲鱼太累啦～请您稍候重试～（1069508800478 实测）
+  //   原因：本店 10 月前的老链接都是桌面引擎发的、SKU 列表为空；这类商品在 PC 编辑侧不接受
+  //         「无规格」payload。解法不是重试，而是【把规格补上】——
+  //         用店铺档案的 规格（代拍费/标准）+ 价格.default + 库存.default 生成一档 SKU。
+  //   副作用（有意）：老链接被改成有规格商品，之后它自己也能被改价/改规格、不会再撞这条。
+  let skuAdd = null;
+  if (!(Array.isArray(cur.sku) && cur.sku.length)) {
+    const sp = (PROF.规格 && Array.isArray(PROF.规格.specs) && PROF.规格.specs.length) ? PROF.规格.specs : [{ valueText: '标准' }];
+    const pn = (PROF.规格 && PROF.规格.propertyName) || '代拍费';
+    const price = (PROF.价格 && PROF.价格.default != null) ? PROF.价格.default : 50;
+    const stock = (PROF.库存 && PROF.库存.default != null) ? PROF.库存.default : 9999;
+    skuAdd = {
+      propertyName: pn,
+      itemProperties: [{ propertyName: pn, supportImage: false, propertyValues: sp.map((x) => ({ propertyValue: x.valueText })) }],
+      itemSkuList: sp.map((x) => ({
+        priceInCent: String(Math.round(parseFloat(x.price != null ? x.price : price) * 100)),
+        quantity: Number(x.quantity != null ? x.quantity : stock),
+        propertyList: [{ propertyText: pn, valueText: x.valueText }],
+      })),
+      quantity: String(stock),
+    };
+    console.log('\n⚠️ 该链接【无规格】（itemSkuList 为空）→ 本次编辑会补上一档规格：' +
+      skuAdd.itemSkuList.map((s) => skuAdd.propertyName + '/' + s.propertyList[0].valueText + ' ¥' + (Number(s.priceInCent) / 100) + ' ×' + s.quantity).join(' | '));
+  }
+
   const codeUpd = `
     var data = {
       itemId: ${JSON.stringify(ID)},
@@ -191,6 +234,12 @@ if (MAIN) console.log('新主图: ' + MAIN); else console.log('新主图: 不改
       uniqueCode: Date.now() + '_' + Math.random().toString(36).substring(2, 10),
       sourceId: 'pcMainPublish', bizcode: 'pcMainPublish', publishScene: 'pcMainPublish'
     };
+    var SKU_ADD = ${JSON.stringify(skuAdd)};
+    if (SKU_ADD) {
+      data.itemProperties = SKU_ADD.itemProperties;
+      data.itemSkuList = SKU_ADD.itemSkuList;
+      data.quantity = SKU_ADD.quantity;
+    }
     var CARRY = ${JSON.stringify(carry)};
     for (var k in CARRY) { if (CARRY[k] !== undefined && CARRY[k] !== null && data[k] === undefined) data[k] = CARRY[k]; }
     var out = {};

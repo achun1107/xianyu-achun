@@ -497,10 +497,60 @@ const SHOUKAI = LIB['⑨ 刘宪华首开样式（紫块白字+红字三行·居�
     // 新增的 tpl_hope_pink 同样是 kind:'json' 且 layers 存在版式库里，所以改成通用取法。
     // 取不到就是空数组，行为与改动前一致（xuliang-v1 本来就没有 layers）。
     if (tpl.kind === 'json') {
-      const t = await new Promise((res, rej) => http.get({ host: '127.0.0.1', port: 8093, path: '/api/poster/templates', headers: { 'x-api-key': KEY } },
-        (x) => { let b = ''; x.on('data', (c) => b += c); x.on('end', () => res(JSON.parse(b))); }).on('error', rej));
-      useLayers = ((t.items || t || []).find((i) => i.id === tpl.key) || {}).layers || [];
-      console.log('文字层[' + tpl.key + ']: ' + useLayers.length + ' 层');
+      // ⚠️【2026-11-13 修】原来这里裸调 JSON.parse(8093 返回体)，没有任何保护。
+      //   问题：8093 如果是【老版本】（没有 /api/poster/templates 这个接口），
+      //   它会返回一页 HTML 404，JSON.parse 直接抛 SyntaxError: Unexpected token '<'，
+      //   学员屏幕上是整屏英文 stack trace —— 完全不知道发生了什么，也看不出是版本不匹配。
+      //   现在：① 检查状态码 ② try/catch ③ 兜底读本地 lib/poster-templates-approved.json
+      //   ④ 都不行就跳过文字层（图照样出，只是没叠字），并说清楚为什么。
+      const localTplFile = path.join(ROOT, 'lib', 'poster-templates-approved.json');
+      const pickLayers = (data) => ((data && (data.items || data)) || [])
+        .filter ? (((data.items || data) || []).find((i) => i && i.id === tpl.key) || {}).layers || [] : [];
+
+      let got = null;
+      try {
+        const raw = await new Promise((res, rej) => {
+          http.get({ host: '127.0.0.1', port: 8093, path: '/api/poster/templates', headers: { 'x-api-key': KEY } },
+            (x) => {
+              let b = '';
+              x.on('data', (c) => { b += c; });
+              x.on('end', () => {
+                if (x.statusCode !== 200) { rej(new Error('HTTP ' + x.statusCode)); return; }
+                res(b);
+              });
+            }).on('error', rej);
+        });
+        got = JSON.parse(raw);
+      } catch (e) {
+        got = null;
+        const why = String(e && e.message || e);
+        // 这条要说得让人看得懂：学员不知道 8093 版本是什么意思
+        console.log('[版式库] 取不到远程版式（' + why + '）—— 8093 可能是旧版本。');
+        console.log('         不影响出图，只是这次不叠文字层。');
+      }
+
+      if (got) {
+        useLayers = pickLayers(got);
+        console.log('文字层[' + tpl.key + ']: ' + useLayers.length + ' 层');
+      } else {
+        // 兜底的真相（2026-11-13 实测过）：
+        //   lib/poster-templates-approved.json 是【审核白名单】，结构是
+        //     { approved: [{ key, name, src }], pending: [...] }
+        //   它只记"哪些版式被老板审核通过过"，【不含 layers 图层数据】——
+        //   真正的图层在中台的 poster-templates 表里，由 8093 拉下来。
+        //   所以 8093 取不到时，本地【没有办法】还原文字层。
+        //   那就别假装能兜底，直说：图照出，字不叠，以及怎么修。
+        let whitelisted = false;
+        try {
+          const local = JSON.parse(fs.readFileSync(localTplFile, 'utf8'));
+          whitelisted = ((local && local.approved) || []).some((x) => x && x.key === tpl.key);
+        } catch (e2) { /* 本地文件读不到就算了，不影响出图 */ }
+        useLayers = [];
+        console.log('文字层: 跳过 —— 8093 取不到版式图层' +
+          (whitelisted ? '（这个版式在本地白名单里，但图层数据只存在 8093）' : '') + '。');
+        console.log('         图照样能出，只是不叠文字。');
+        console.log('         要恢复叠字：把 xianyu-playwright-service 更新成跟安装包同一个版本。');
+      }
     }
   }
   if (useLayers && useLayers.length) {
