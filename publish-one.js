@@ -35,6 +35,30 @@ const PROFILE = storeProfile.load(STORE);
 const CITY = process.argv[2] || '杭州';
 const STAR = process.argv[3] || '那英';
 const DRY = process.argv.indexOf('--dry') >= 0;
+
+// 【2026-11-13 加】没有自己的档案 → 【不许真发】。
+//   为什么：storeProfile.load() 遇到不存在的档案时，只往 stderr 打一段警告，
+//   然后【返回 DEFAULTS 继续跑】。--dry 的时候这没问题（正好看看默认效果），
+//   但真发就会用默认的主图模板 / 默认价格 / 通用文案发出去 ——
+//   学员第一次配店之前如果先试了真发，平台上就多了一条风格和价格都不对的链接。
+//   老店都有 stores/<店>.json，所以这条对现有店铺零影响。
+//   ├ 想看默认效果：加 --dry（能出图，不会发）
+//   └ 想变成自己的店：node tools\store-wizard.js "<店铺名>"，或网页点「⑤ 配置一家新店」
+if (!DRY && !storeProfile.exists(STORE)) {
+  console.log('');
+  console.log('❌「' + STORE + '」还没有自己的档案，不能真发。');
+  console.log('');
+  console.log('   用默认值发出去，主图模板是随机的、价格和文案都是通用的 —— 那不是你的店。');
+  console.log('');
+  console.log('   ① 先看效果（能出图，不会发）：');
+  console.log('        node publish-one.js ' + (process.argv[2] || '杭州') + ' ' + (process.argv[3] || '那英') + ' --dry');
+  console.log('   ② 把它变成你自己的店（五步，约 3 分钟）：');
+  console.log('        node tools\\store-wizard.js "' + STORE + '"');
+  console.log('        （或者打开网页，点「⑤ 配置一家新店」）');
+  console.log('   ③ 配好之后再回来发。');
+  console.log('');
+  process.exit(1);
+}
 // 发布成功后回读校验（用闲鱼编辑页的 editdetail 把规格/价格/库存/类目/发货/承诺读回来比对）。
 // 默认开；要跳过传 --no-verify 或 KUN_NO_VERIFY=1。
 const NO_VERIFY = process.argv.indexOf('--no-verify') >= 0 || process.env.KUN_NO_VERIFY === '1';
