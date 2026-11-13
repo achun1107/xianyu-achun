@@ -609,6 +609,7 @@ const check = (name, ok, detail) => {
       { rel: 'xianyu-achun/学员安装-给学员DSH.md', why: 'AI agent 任务书' },
       { rel: 'xianyu-achun/学员常见错误速查.md', why: '按报错关键词搜的那份' },
       { rel: 'install-guide.html', why: '包根层图文安装说明' },
+      { rel: '先看这个-五步上手.html', why: '包根层一页纸（解压第一眼就看到的）' },
     ];
     const missingDocs = [];
     for (const d of REQUIRED_DOCS) {
@@ -617,7 +618,7 @@ const check = (name, ok, detail) => {
       try { ok = fs.existsSync(p) && fs.statSync(p).size >= 200; } catch (e) { ok = false; }
       if (!ok) missingDocs.push(path.basename(d.rel));
     }
-    check('五个学员入口文件都在包里且非空', missingDocs.length === 0,
+    check('六个学员入口文件都在包里且非空', missingDocs.length === 0,
       missingDocs.length ? missingDocs.join(', ') : REQUIRED_DOCS.length + ' 个文件');
   }
 
