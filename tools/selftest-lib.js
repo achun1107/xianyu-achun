@@ -58,6 +58,44 @@ const logmod = require('../lib/log');
   const a = args.parse(['广州', '宋雨琦', '--n=3', '--dry', '--store', '好易美代拍']);
   assert(a._.length === 2 && a.n === '3' && a.dry === true && a.store === '好易美代拍', 'args 解析（含中文）');
 
+  // ── 标题规则（lib/title.js）──
+  //   为什么加（2026-11-13）：这是「城市明星 → 商品标题」的唯一实现，
+  //   规则错了发出去就是标题被平台静默砍掉（尾部看不见地丢字）。
+  //   原来只有手工验过，没有断言，改代码时没人拦得住。
+  const title = require('../lib/title');
+  const FIT = title.makeFitTitle({ pad: ['（可看评价）', '高命中率'], max: 30, min: 28 });
+
+  // ① 平台硬上限就是 30，任何时候都不能超
+  assert(title.PLATFORM_TITLE_MAX === 30, '平台标题上限 = 30 字');
+  assert(FIT.max === 30, 'makeFitTitle 把 max 压到 30（档案配更大也不认）');
+
+  // ② 超长必收进 30，且括号不残缺
+  const longTitle = '【代拍必中高命中率】广州王嘉尔演唱会首开代抢全价位都能接秒付前排';
+  const fitLong = FIT(longTitle);
+  assert(fitLong.length <= 30, '超长标题被收到 ≤30 字（实际 ' + fitLong.length + '）');
+  assert(title.closeBrackets(fitLong) === fitLong, '截断后括号是闭合的');
+
+  // ③ 【回归】空/空白标题不补成一屏感叹号
+  //   2026-11-13 发现：空串会走补足逻辑，产出「（可看评价）！！！！…」共 28 字。
+  //   空标题是上游没生成出来，应该空着暴露问题，不该用感叹号糊过去。
+  const fitEmpty = FIT('');
+  const fitBlank = FIT('   ');
+  assert(fitEmpty === '' && fitBlank === '', '空/空白标题不补感叹号（实际: ' + JSON.stringify(fitEmpty) + '）');
+
+  // ④ 【回归】squeezeTitle 漏传 max 时不产出 undefined
+  //   2026-11-13 发现：how 会变成「硬截断到 undefined 字」。
+  const noMax = title.squeezeTitle(longTitle);
+  assert(noMax.how.indexOf('undefined') < 0, 'squeezeTitle 漏传 max 时不说 undefined');
+  assert(noMax.text.length <= 30, 'squeezeTitle 漏传 max 时仍收到 ≤30 字');
+
+  // ⑤ 短标题会补到 min（这是老行为，故意的：卡片标题不满 30 会让正文渗进来）
+  const fitShort = FIT('广州王嘉尔');
+  assert(fitShort.length === 28, '短标题补到 min=28（实际 ' + fitShort.length + '）');
+
+  // ⑥ 正常长度的标题【原样保留】，不该被改
+  const ok30 = '【代拍必中】王嘉尔广州站演唱会首开接代拍首开代抢王嘉尔演唱会';
+  assert(FIT(ok30) === ok30, '刚好 30 字的标题原样保留');
+
   // ── 服务 ──
   const up = await http.alive();
   out.kv('服务存活', up ? '是' : '否');

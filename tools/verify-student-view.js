@@ -591,7 +591,60 @@ const check = (name, ok, detail) => {
     check('包内核心模块都能 require', ok, detail);
   }
 
-  // ── ⑮ 汇总 ──
+  // ── ⑮ 公共库纯函数断言（selftest-lib.js）──
+  //   为什么加（2026-11-13）：⑨⑭ 只验「语法对不对」「加载得起来」，
+  //   它们验不了「算得对不对」—— 标题规则算错、金额换算算错，代码照样能加载。
+  //
+  //   ⚠️ 只查【纯函数】那几组，不要求整个 selftest 全过：
+  //   包里没有 config.local.json（学员自己建），所以「Key 已加载」「店铺名非空」这类
+  //   依赖配置的断言在包里必然失败 —— 那是预期的，不是包坏了。
+  console.log('\n⑮ 公共库纯函数断言');
+  {
+    const st = path.join(achun, 'tools', 'selftest-lib.js');
+    if (!fs.existsSync(st)) {
+      check('包内有 selftest-lib.js', false, '包里缺这个脚本');
+    } else {
+      // 这几条只依赖纯函数，跟配置文件无关，包里必须全过
+      const PURE = [
+        '平台标题上限',
+        'makeFitTitle 把 max 压到 30',
+        '超长标题被收到',
+        '截断后括号是闭合的',
+        '空/空白标题不补感叹号',
+        'squeezeTitle 漏传 max 时不说 undefined',
+        '短标题补到 min',
+        '刚好 30 字的标题原样保留',
+        '分转元',
+        '集合计划识别',
+        '单链接识别',
+        '状态判定 online',
+      ];
+      let raw = '';
+      try {
+        raw = execFileSync('node', [st], {
+          cwd: achun, encoding: 'utf8', timeout: 120000, stdio: 'pipe',
+        });
+      } catch (e) {
+        raw = String(e.stdout || '');
+      }
+      // 逐行看：✅ <msg> / ❌ <msg>
+      const seen = new Map();
+      for (const line of raw.split(/\r?\n/)) {
+        const m = line.match(/^\s*(✅|❌)\s*(.+?)(?:（.*)?$/);
+        if (m) seen.set(m[2].trim(), m[1]);
+      }
+      const missed = PURE.filter((k) => {
+        for (const [msg, mark] of seen) {
+          if (msg.indexOf(k) >= 0) return mark !== '✅';
+        }
+        return true;   // 完全没看到这条
+      });
+      check('公共库纯函数断言全过', missed.length === 0,
+        missed.length ? '未过/缺失: ' + missed.slice(0, 2).join(', ') : PURE.length + ' 条');
+    }
+  }
+
+  // ── ⑯ 汇总 ──
   const bad = results.filter(r => !r.ok);
   console.log('\n════ 结果 ════');
   console.log('  ' + (results.length - bad.length) + '/' + results.length + ' 通过');
