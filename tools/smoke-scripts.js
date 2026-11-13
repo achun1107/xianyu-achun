@@ -127,6 +127,14 @@ function main() {
         must: [/没有叫「冒烟测试-不存在的店」的店铺/],
         mustNot: [/\{"ok":false/],
       },
+      {
+        // 第 159 轮：store-login 原来每次都把 switch 的整个返回值甩出来
+        //   （切换店铺：{"ok":true,"state":...}），失败时只说「切换失败，中止」。
+        //   这条用【不存在的店名】触发，它会在开浏览器【之前】就退出，安全。
+        args: ['tools/store-login.js', '冒烟测试-不存在的店'],
+        must: [/账号列表里没有「冒烟测试-不存在的店」/],
+        mustNot: [/\{"ok":/],
+      },
     ];
     let argBad = 0;
     for (const c of WITH_ARGS) {

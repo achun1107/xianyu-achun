@@ -87,8 +87,21 @@ async function probe() {
   log('目标「' + acc.name + '」 id=' + acc.id + '  手机=' + (acc.username || '').trim() + '  已有登录态=' + fs.existsSync(stateFile));
 
   const sw = await post('/api/agent/switch', { storeName: NAME, accountId: acc.id }, { timeout: 180000 });
-  log('切换店铺：' + JSON.stringify(sw).slice(0, 140));
-  if (!sw || sw.ok !== true) { log('❌ 切换失败，中止'); process.exit(1); }
+  // 【2026-11-14 第 159 轮】这里原来【每次都】把整个返回值甩出来：
+  //     切换店铺：{"ok":true,"state":"ready","tabId":...}
+  //   学员扫码头一步就看到一坨内部字段；失败时（原来 L91）只说「切换失败，中止」，不给原因。
+  //   改成：成功给一句中文，失败把服务端的中文原因带出来 + 给下一步。
+  if (sw && sw.ok === true) {
+    log('✅ 已切到「' + NAME + '」');
+  } else {
+    const why = String((sw && (sw.error || sw.msg)) || '').trim();
+    log('❌ 切换到「' + NAME + '」失败' + (why ? '：' + why : '（服务端没给原因）'));
+    if (/账号未找到|账号不存在/.test(why)) {
+      log('   → 店名和 8093 账号表对不上。跑 node tools\\store-ready.js "店名" 能列出现有店铺。');
+    }
+    log('   → 先确认 8093 服务开着（黑窗口里有「闲鱼上架助手已启动」）。');
+    process.exit(1);
+  }
 
   // 导航到广告后台：① 登录判据在这里最靠谱 ② 没登录时它会自己弹登录入口
   await evalOnStore('location.href=' + JSON.stringify(AD) + ';"nav"', 60000).catch(() => {});
@@ -99,7 +112,9 @@ async function probe() {
   log('   本脚本不调 /api/agent/login（它是坏的，见文件头），我只负责检测 + 存档');
 
   const p0 = await probe();
-  log('  当前探测：' + JSON.stringify(p0).slice(0, 220));
+  // 【第 159 轮】原来这里是 JSON.stringify(p0) —— 学员看到 {"ok":false,"href":...} 一坨。
+  //   他只关心一件事：登录了没有。
+  log('  当前状态：' + (p0 && p0.ok ? '✅ 已登录' : '未登录（在弹出的窗口里完成扫码/短信）'));
   if (p0 && p0.ok) { log('（已经是登录态，直接进存档流程）'); }
 
   const deadline = Date.now() + WAIT_MIN * 60000;
@@ -128,8 +143,15 @@ async function probe() {
   await post('/api/agent/switch', { storeName: NAME, accountId: acc.id }, { timeout: 180000 });
   await sleep(3000);
   const pv = await probe();
-  log('  复核：' + JSON.stringify(pv).slice(0, 220));
+  log('  复核：' + (pv && pv.ok ? '✅ 登录态能恢复' : '❌ 恢复不了（下面会说怎么办）'));
   if (pv && pv.ok) { log('🎉「' + NAME + '」登录完成且登录态可恢复'); process.exit(0); }
   log('⚠ 存档后复核没通 —— 可能页面被回收了，重跑一次本脚本再看。');
   process.exit(1);
-})().catch((e) => { log('❌ ' + ((e && e.stack) || e)); process.exit(1); });
+})().catch((e) => {
+  // 【第 159 轮】原来直接打 e.stack —— 一坨英文行号，学员只会以为装坏了。
+  //   改成：先用中文说「脚本出错了」，再把细节放后面并标明「发给管理员、看不懂可以忽略」。
+  log('❌ 脚本出错了：' + String((e && e.message) || e));
+  log('   把这几行发给管理员就行；下面是细节，看不懂可以忽略：');
+  String((e && e.stack) || '').split('\n').slice(0, 4).forEach((l) => log('   ' + l));
+  process.exit(1);
+});
