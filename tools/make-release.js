@@ -102,6 +102,20 @@ function excluded(rel) {
   /^(workbuddy-task-|协作|交接-|项目瘦身|管理员竞选|管理员交接|派活模板)/,
   /^(闲鱼自动化-操作手册|中台账号与Key-对照|住宅代理采购|聚光取数清单|巡检日常动作清单)\.md$/,
   /^(闲鱼项目-|闲鱼自动化项目-|票务Hope-|主图规范-|文案对照-|贴图模板-|出图SOP-|采集SOP-|多店铺快速配置|员工使用方案|中台需求|企微CLI|好易美中台-|闲鱼上架与擦亮)/,
+  // 【2026-11-13 加·第二批】包里的【内部 PowerShell 脚本】。
+  //   第 108 轮只排了 .cmd，这轮扫 .ps1 才发现还有一整套：
+  //     ad-*.ps1（4 个）—— 老板的广告定时任务，由 Windows 计划任务唤醒
+  //     wecom-send.ps1  —— 企微发消息
+  //     workbuddy-*.ps1/.cmd —— 内部 CLI 登录与运行
+  //     ask-dsh / make-channel / ss-call / test-guard-live / add-cmd-sheet —— 内部工具
+  //     wake-publish-sleep.* —— 保活任务（注释里直接写着 D:\DSH\achun\暂停发布.cmd）
+  //   学员拿到这些只会困惑（双击了多半报错），而且里面有内部地址和调用方式。
+  //
+  //   要保留的（学员真会双击的）：install.ps1 / install.cmd / 体检.cmd /
+  //   启动.cmd / run-node.cmd / start.bat，以及 lib\ps\*.ps1（被 run-node 那条链用）。
+  /^(ad-[\w-]+|wecom-send|ask-dsh|make-channel|ss-call|test-guard-live|add-cmd-sheet|workbuddy-[\w-]+|login-workbuddy|wake-publish-sleep)\.(ps1|cmd|bat)$/,
+  /(^|\/)(workbuddy-[\w-]*|login-workbuddy)\.(ps1|cmd)$/,
+  /(^|\/)(verify-config|test-utf8-writer)\.ps1$/,
   ];
   return rules.some((r) => r.test(f));
 }

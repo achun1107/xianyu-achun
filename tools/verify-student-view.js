@@ -622,12 +622,52 @@ const check = (name, ok, detail) => {
       missingDocs.length ? missingDocs.join(', ') : REQUIRED_DOCS.length + ' 个文件');
   }
 
-  // ── ⑭ 核心模块能不能真的 require ──
+  // ── ⑭ 包里不该有老板的脚本 ──
+  //   为什么加（2026-11-13，第 108-109 轮）：这是【反向检查】。
+  //   前面 ①~⑬ 全在验"该有的东西在不在"，没有一条验"不该有的东西在不在"。
+  //   实测：包里曾带着「暂停发布.cmd」「ad-balance-duty.ps1」「wecom-send.ps1」这些东西，
+  //   学员误点「暂停发布.cmd」= 自动发布整个停掉，而且这些脚本里写死的都是 D:\DSH\achun。
+  //   现在把包里的 .cmd/.bat/.ps1 全列出来，只允许白名单里的存在。
+  console.log('\n⑭ 包里没有老板的脚本');
+  {
+    // 这几个是学员真会用/会被链式调用的
+    const ALLOWED = new Set([
+      'install.cmd',            // 包根 + xianyu-achun 各一份
+      'install.ps1',
+      'run-node.cmd',           // 版本无关的 node 启动器
+      '体检.cmd',               // 一键体检，学员双击用
+      '启动.cmd',               // staff-ui 服务
+      'start.bat',              // 8093 服务
+      'native_host.bat',        // monitor 的原生消息宿主
+      '一键安装.bat',           // monitor 安装
+      'install_host.ps1',       // monitor 宿主安装
+      'Config.ps1', 'Idle.ps1', 'Writes.ps1',   // lib/ps 被 run-node 那条链用
+    ]);
+    const found = [];
+    (function rec(d) {
+      for (const name of fs.readdirSync(d)) {
+        if (name === 'node_modules' || name === '.git') continue;
+        const p = path.join(d, name);
+        const st = fs.statSync(p);
+        if (st.isDirectory()) { rec(p); continue; }
+        if (/\.(cmd|bat|ps1)$/i.test(name)) {
+          const rel = path.relative(root, p).replace(/\\/g, '/');
+          found.push({ rel, name });
+        }
+      }
+    })(root);
+
+    const extra = found.filter((x) => !ALLOWED.has(x.name));
+    check('包里没有老板的脚本（.cmd/.bat/.ps1）', extra.length === 0,
+      extra.length ? extra.slice(0, 3).map((x) => x.rel).join(' | ') : found.length + ' 个脚本');
+  }
+
+  // ── ⑮ 核心模块能不能真的 require ──
   //   为什么加（2026-11-13）：⑨ 组只用 vm.Script 做【语法解析】，
   //   语法对不等于能加载 —— require 链上任何一环缺文件、循环依赖、ESM/CJS 混用，
   //   都会在运行时抛错，而语法检查看不出来。
   //   这一组在包内目录里真跑一次 require，验的是"加载得起来"。
-  console.log('\n⑭ 核心模块能 require');
+  console.log('\n⑮ 核心模块能 require');
   {
     const MODS = ['./lib/env', './lib/http', './lib/agent', './lib/store-profile', './lib/user-id', './lib/museav'];
     const code = MODS.map((m) =>
@@ -648,14 +688,14 @@ const check = (name, ok, detail) => {
     check('包内核心模块都能 require', ok, detail);
   }
 
-  // ── ⑮ 公共库纯函数断言（selftest-lib.js）──
+  // ── ⑯ 公共库纯函数断言（selftest-lib.js）──
   //   为什么加（2026-11-13）：⑨⑭ 只验「语法对不对」「加载得起来」，
   //   它们验不了「算得对不对」—— 标题规则算错、金额换算算错，代码照样能加载。
   //
   //   ⚠️ 只查【纯函数】那几组，不要求整个 selftest 全过：
   //   包里没有 config.local.json（学员自己建），所以「Key 已加载」「店铺名非空」这类
   //   依赖配置的断言在包里必然失败 —— 那是预期的，不是包坏了。
-  console.log('\n⑮ 公共库纯函数断言');
+  console.log('\n⑯ 公共库纯函数断言');
   {
     const st = path.join(achun, 'tools', 'selftest-lib.js');
     if (!fs.existsSync(st)) {
