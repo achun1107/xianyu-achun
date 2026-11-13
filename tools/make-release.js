@@ -49,6 +49,12 @@ try {
 function excluded(rel) {
   const f = rel.replace(/\\/g, '/');
   if (f === 'stores/_template.json') return false;                 // 例外：建店模板要发
+  // 【2026-11-13 加】tools/_syntax-check-all.js 是【学员包里的 verify-student-view 要调用的】。
+  //   原来它被下面的「下划线开头 = 一次性脚本」规则排除，结果：
+  //     · git 里加了（git add -f）→ 但 make-release 还是不带它
+  //     · 包里 verify-student-view 的⑨组 execFileSync 调它 → ENOENT
+  //   这和 install.cmd 那次是同一类错：多个环节各有一套排除规则，改一个不够。
+  if (f === 'tools/_syntax-check-all.js') return false;             // 例外：自检要用
   const rules = [
     /^stores\//,                    // 老板各店的档案（含价格策略、素材路径）
     /^publish-assets\//,            // 85MB 素材，学员自己出
