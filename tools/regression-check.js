@@ -191,6 +191,29 @@ has('tools/_build-install-bundle.js', /先看这个-五步上手/, '105  一页�
     : ok('131  校验命令没用 <版本> 占位符');
 }
 
+// ── 一页纸的截图不能比 html 老 ──
+//   第 133 轮：交付清单里写着「截图 publish-out/学员五步上手-整页.png」，
+//   但那是手工截的 —— 实测图比 html 老 17.5 小时，贴群里的图和实际说明不一致。
+//   现在有 tools/shot-one-pager.js 自动生成，这条检查提醒「改完 html 要重截」。
+{
+  const html = path.join(ROOT, '学员五步上手.html');
+  const png = path.join(ROOT, 'publish-out', '学员五步上手-整页.png');
+  if (!fs.existsSync(html)) {
+    console.log('  · 一页纸 html 不存在，跳过截图检查');
+  } else if (!fs.existsSync(png)) {
+    bad('133  一页纸截图存在且不比 html 老', '还没生成，跑 node tools\\shot-one-pager.js');
+  } else {
+    const h = fs.statSync(html).mtimeMs;
+    const p = fs.statSync(png).mtimeMs;
+    if (p < h) {
+      const hours = Math.round((h - p) / 3600000);
+      bad('133  一页纸截图存在且不比 html 老', '图比 html 老 ' + hours + ' 小时，跑 node tools\\shot-one-pager.js');
+    } else {
+      ok('133  一页纸截图存在且不比 html 老');
+    }
+  }
+}
+
 // ── 文档 ─────────────────────────────────────────────────
 has('管理员手册-分发包维护.md', /## 目录/, '123  管理员手册有目录');
 has('学员配置手册.md', /## 目录/, '124  学员配置手册有目录');
