@@ -327,7 +327,13 @@ const TOOLS_ALLOWED = new Set([
   //   （根层还有 16 个 probe-* 是老板的一次性探测脚本，不要一起放进来）
   'probe-mtop-apis.js', 'probe-event-dup.js', 'ad-set-bid-budget.js',
   // 体检 / 自检
-  'healthcheck.js', 'selftest-lib.js', 'selftest-update.js',
+  'healthcheck.js', 'selftest-lib.js',
+  // 【2026-11-13 第 152 轮】selftest-update.js 不进包：
+  //   它是【开发机的回归测试】—— 要 git（造源码仓 + clone 两台机器），
+  //   还要 stores/好易美代拍.json（那是老板的店，打包规则早排掉了）。
+  //   在学员机上跑必然炸在 ENOENT 上，而它验的「update.js 走 git 更新」
+  //   本来就是学员用不了的那条路（第 151 轮）。
+  //   留着只会让学员以为自己装坏了。
   'verify-student-view.js',      // 技术负责人可用（找不到包时会自己说明）
   '_syntax-check-all.js',        // 被 verify 调用
   // 更新 / 编码 / 工具

@@ -67,11 +67,20 @@ function fetchJson(url) {
 // ── 2. 遍历 git 跟踪的文本文件 ──────────────────────────────────
 function trackedFiles() {
   try {
-    const out = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    // stdio 必须显式给：不给的话 git 的 stderr（"fatal: not a git repository..."）
+    //   会直接漏到学员屏幕上，那正是这个 catch 要避免的英文报错。
+    const out = execFileSync('git', ['ls-files', '-z'],
+      { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
     return out.split('\0').filter(Boolean);
   } catch (e) {
-    console.log('❌ 读不到 git 跟踪文件列表（不是 git 仓库？）：' + e.message);
-    process.exit(1);
+    // 【2026-11-13 第 152 轮】学员包【不带 .git】（打包规则第 ③ 条 —— 带了等于把
+    //   git 历史和内部密钥发出去），所以 `git ls-files` 在学员机上必然失败。
+    //   原来这里直接 process.exit(1)，学员照《学员配置手册》速查表敲
+    //   `node tools/scrub-secrets.js` 就卡在一句英文上：
+    //       ❌ 读不到 git 跟踪文件列表（不是 git 仓库？）：Command failed: git ls-files
+    //   而这个脚本本来就有一个 walkTracked() 在遍历目录 —— 没有 git 概念时，
+    //   「包里的文件」就等于「会被发出去的文件」，扫全部反而更保险。
+    return null;
   }
 }
 
@@ -104,13 +113,21 @@ async function main() {
   if (!SECRETS.size) { console.log('  没有可清理的值'); return; }
 
   const files = walkTracked(ROOT, []);
-  const tracked = new Set(trackedFiles().map((f) => path.resolve(ROOT, f)));
+  const trackedList = trackedFiles();
+  // tracked === null → 这台机器没有 git（学员包就是这样），
+  //   此时「包里的文件」就等于「会被发出去的文件」，扫全部。
+  const tracked = trackedList === null
+    ? null
+    : new Set(trackedList.map((f) => path.resolve(ROOT, f)));
+  if (tracked === null) {
+    console.log('· 这台机器不是 git 仓库（学员包不带 .git），改为扫目录下全部文件');
+  }
   let dirty = 0, changed = 0;
   const report = [];
   const skipped = [];      // 非 UTF-8 / 读不了 —— 必须报出来，静默跳过等于漏网
 
   for (const f of files) {
-    if (!tracked.has(path.resolve(f))) continue;              // 只看跟踪的（未跟踪的不会进仓库）
+    if (tracked && !tracked.has(path.resolve(f))) continue;   // 有 git 只看跟踪的（未跟踪的不会进仓库）
     let buf;
     try { buf = fs.readFileSync(f); } catch (e) { skipped.push(path.relative(ROOT, f) + '（读不了: ' + e.message + '）'); continue; }
     if (buf.length > 4 * 1024 * 1024) { skipped.push(path.relative(ROOT, f) + '（>4MB）'); continue; }

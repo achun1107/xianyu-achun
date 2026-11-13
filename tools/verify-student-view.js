@@ -365,10 +365,11 @@ const check = (name, ok, detail) => {
         // 管理员手册里写它们是对的（那是给维护者看的）。
         'tools/_sync-public.js',
         'tools/publish-package.js',
-        // 【2026-11-13 第 136 轮加】第 136 轮排掉了这两个（学员跑会看到假的「有修复被覆盖了」）：
-        //   regression-check.js —— 查源码历史修复，读发布目录
-        //   scan-package.js     —— 读 D:\xianyu-release 里的 zip
-        // 管理员手册里写它们是对的（给维护者看的）。
+        // 【2026-11-13 第 152 轮加】selftest-update.js 不进包（开发机的回归测试，
+        //   要 git + 老板的店档案），但《学员配置手册》1.8 节里在
+        //   <details>「开发机用的命令（学员可以忽略）」中提到了它 —— 那段是给
+        //   维护者看的，提到是对的，不该报"缺"。
+        'tools/selftest-update.js',
         'tools/regression-check.js',
         'tools/scan-package.js',
       ]);
@@ -727,7 +728,8 @@ const check = (name, ok, detail) => {
       'list-onsale.js', 'ad-review.js',
       'probe-mtop-apis.js', 'probe-event-dup.js', 'ad-set-bid-budget.js',
       // 体检 / 自检
-      'healthcheck.js', 'selftest-lib.js', 'selftest-update.js',
+      // selftest-update.js 不进包（第 152 轮）：开发机的回归测试，要 git + 老板的店档案
+      'healthcheck.js', 'selftest-lib.js',
       'verify-student-view.js',      // 技术负责人可用（找不到包时会说明）
       '_syntax-check-all.js',        // 被 verify 调用
       // 更新 / 编码
