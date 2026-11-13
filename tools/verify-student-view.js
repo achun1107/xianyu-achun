@@ -239,6 +239,35 @@ const check = (name, ok, detail) => {
     const broken = mustHave.filter(k => html.indexOf(k) < 0);
     check('关键路径完整（反斜杠没被吃）', broken.length === 0,
       broken.length ? '缺: ' + broken.join(' / ') : '');
+
+    // ④ 命令里的 --参数，脚本到底认不认
+    //   为什么加（2026-11-13）：install-guide 里写着
+    //     node publish-one.js 广州 王嘉尔 --yes    :: 真发
+    //   但 publish-one.js 里【根本没有 --yes 这个参数】—— 它把 --yes 当未知参数静默忽略，
+    //   而「不加 --dry 就是真发」，学员以为自己在"确认"，其实已经发出去了。
+    //   这比代码 bug 危险：代码会报错，文档教错是让人【以为自己是对的】。
+    //
+    //   判定用宽松匹配：只要那个脚本文件里任何地方出现过 `--xxx` 字样就算支持
+    //   （宁可漏报注释里提过的参数，也不要误报真参数）。
+    const flagProblems = [];
+    const cmds = [];
+    for (const b of blocks) {
+      for (const line of b.split(/\r?\n/)) {
+        const m = line.match(/node\s+((?:tools[\\/])?[\w.-]+\.js)\s+(.+)$/);
+        if (m) cmds.push({ script: m[1].replace(/\\/g, '/'), rest: m[2] });
+      }
+    }
+    for (const c of cmds) {
+      const sp = path.join(achun, c.script);
+      if (!fs.existsSync(sp)) continue;                 // 脚本不存在由上一项报
+      const src = fs.readFileSync(sp, 'utf8');
+      const known = new Set([...src.matchAll(/(--[a-z][a-z0-9-]*)/g)].map((x) => x[1]));
+      for (const u of [...c.rest.matchAll(/(--[a-z][a-z0-9-]*)/g)].map((x) => x[1])) {
+        if (!known.has(u)) flagProblems.push(c.script + ' 没有 ' + u);
+      }
+    }
+    check('guide 里的 --参数脚本都认', flagProblems.length === 0,
+      flagProblems.length ? flagProblems.slice(0, 3).join(' | ') : cmds.length + ' 条命令');
   }
 
   // ── ⑧ 扩展代码（monitor）的语法检查 ──
