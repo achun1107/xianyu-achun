@@ -573,6 +573,26 @@ const SHOUKAI = LIB['⑨ 刘宪华首开样式（紫块白字+红字三行·居�
   const jpg = await sharp(Buffer.from(imgB64, 'base64')).jpeg({ quality: 92 }).toBuffer();
   const imgFile = path.join(OUTDIR, [CITY, STAR, tpl.key.replace(/[^a-z0-9_-]/gi, ''), Date.now()].join('-') + '.jpg');
   fs.writeFileSync(imgFile, jpg);
+  // ── 出图后顺手清理 publish-out ──
+  // 【2026-11-13 加】这个目录只增不减：实测 456 个文件 / 161.9 MB，最老的从 09-26 起。
+  //   每跑一次（含 --dry）就多一张 300KB 的图，学员反复试模板时会长得很快。
+  //   安全性：图片上传后会拿到图床 URL（台账里的「图床URL」字段），
+  //   商品显示用的是那个 URL，本地这张删了不影响；
+  //   台账里的本地「图片」路径会失效，但那一条同时也记着 URL，回溯不受影响。
+  //   策略：只留最近 150 张（约 50 MB），够复盘用。
+  try {
+    const olds = fs.readdirSync(OUTDIR)
+      .map((n) => path.join(OUTDIR, n))
+      .filter((p) => { try { return fs.statSync(p).isFile(); } catch (e) { return false; } })
+      .map((p) => { try { return { p, t: fs.statSync(p).mtimeMs }; } catch (e) { return null; } })
+      .filter(Boolean)
+      .sort((a, b) => b.t - a.t);
+    let removed = 0;
+    for (const x of olds.slice(150)) {
+      try { fs.unlinkSync(x.p); removed++; } catch (e) { /* 占用中就跳过 */ }
+    }
+    if (removed) console.log('[清理] publish-out 删了 ' + removed + ' 张旧图（保留最近 150 张）');
+  } catch (e) { /* 清理失败不影响出图 */ }
   const meta = await sharp(jpg).metadata();
   console.log('图片: ' + path.basename(imgFile) + '  ' + Math.round(jpg.length / 1024) + ' KB  ' + meta.width + 'x' + meta.height);
 
