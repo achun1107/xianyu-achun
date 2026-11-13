@@ -241,7 +241,56 @@ const check = (name, ok, detail) => {
       broken.length ? '缺: ' + broken.join(' / ') : '');
   }
 
-  // ── ⑧ 汇总 ──
+  // ── ⑧ 扩展代码（monitor）的语法检查 ──
+  //   为什么单独一组（2026-11-13）：xianyu-monitor 是 Chrome 扩展，里面的 js 是
+  //   【浏览器代码】—— 有 importScripts、顶层 await、chrome.* API。
+  //   用 `node -c`（CommonJS）检查会误报；必须复制成 .mjs 用 `node --check`。
+  //
+  //   但那天的教训是：**误报里也藏着真错**。background.js 报
+  //     SyntaxError: await is only valid in async functions
+  //   —— 这不是"浏览器专有语法"，是语法层的，Chrome 同样会拒。
+  //   实际确认：PD_STOP_PUBLISH 分支的 await 没包 async IIFE，
+  //   而外层 onMessage.addListener 不是 async → 整个 background.js 不加载。
+  //   它活了三个多月没人发现，因为发布主流程走 content script，不依赖 background。
+  console.log('\n⑧ xianyu-monitor 的浏览器代码语法');
+  const monDir = path.join(root, 'xianyu-monitor');
+  if (!fs.existsSync(monDir)) {
+    check('xianyu-monitor 目录存在', false);
+  } else {
+    const jsFiles = [];
+    (function rec(d) {
+      for (const name of fs.readdirSync(d)) {
+        if (name === 'node_modules' || name === '.git') continue;
+        const p = path.join(d, name);
+        const st = fs.statSync(p);
+        if (st.isDirectory()) { rec(p); continue; }
+        if (/\.js$/i.test(name)) jsFiles.push(p);
+      }
+    })(monDir);
+
+    const synBad = [];
+    const tmpd = fs.mkdtempSync(path.join(os.tmpdir(), 'xy-syn-'));
+    for (const f of jsFiles) {
+      const dst = path.join(tmpd, path.basename(f).replace(/\.js$/i, '') + '_' + Math.random().toString(36).slice(2, 8) + '.mjs');
+      fs.copyFileSync(f, dst);
+      try {
+        execFileSync('node', ['--check', dst], { stdio: 'pipe', timeout: 30000 });
+      } catch (e) {
+        // 只报语法层错误；importScripts / chrome is not defined 这类是运行时，不算
+        const msg = String((e.stderr || '') + (e.stdout || ''));
+        if (/SyntaxError/.test(msg)) {
+          const firstLine = (msg.split(/\r?\n/).find(l => /SyntaxError/.test(l)) || '').trim();
+          synBad.push(path.basename(f) + ': ' + firstLine);
+        }
+      }
+    }
+    try { fs.rmSync(tmpd, { recursive: true, force: true }); } catch (e) {}
+
+    check('monitor 的 js 没有语法错误（按 ES module 解析）', synBad.length === 0,
+      synBad.length ? synBad.slice(0, 2).join(' | ') : jsFiles.length + ' 个文件');
+  }
+
+  // ── ⑨ 汇总 ──
   const bad = results.filter(r => !r.ok);
   console.log('\n════ 结果 ════');
   console.log('  ' + (results.length - bad.length) + '/' + results.length + ' 通过');

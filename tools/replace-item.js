@@ -44,11 +44,12 @@ const STAR = argv[2];
 const EVENT = argv[3] || '演唱会';
 const SESSION = argv[4] || '首开';
 const MAIN = GET('main', '');
+const SUBS = GET('subs', '');   // 【2026-11-13 加】整组换副图：目录或逗号分隔的文件列表
 const MAIN_ONLY = argv.includes('--main-only');   // 只换主图，标题/正文保持线上原样
 const TPL = GET('tpl', '');
 
 if (!ID || !CITY || !STAR) {
-  console.log('用法: node tools/replace-item.js <itemId> <城市> <明星> <活动类型> <场次类型> [--main=图] [--tpl=3] [--store=店名] [--go]');
+  console.log('用法: node tools/replace-item.js <itemId> <城市> <明星> <活动类型> <场次类型> [--main=图] [--subs=目录|文件,文件] [--tpl=3] [--store=店名] [--go]');
   process.exit(2);
 }
 
@@ -163,6 +164,34 @@ if (MAIN) console.log('新主图: ' + MAIN); else console.log('新主图: 不改
     console.log('主图 ✅ ' + u.url);
   }
 
+  // 3b. 副图【2026-11-13 加】--subs=<目录|逗号分隔文件>：整组换掉副图，不给就保留线上原样。
+  //     为什么需要：老链接自带的是别家品牌水印的战绩拼图，换店后要整组换成自己的口径。
+  let newSubs = null;
+  if (SUBS) {
+    const sharp2 = require(path.join(require('../lib/env').PATHS.playwrightService, 'node_modules', 'sharp'));
+    const { post: post2 } = require('../lib/http');
+    let files = [];
+    if (fs.existsSync(SUBS) && fs.statSync(SUBS).isDirectory()) {
+      files = fs.readdirSync(SUBS).filter((f) => /\.(jpg|jpeg|png|webp)$/i.test(f))
+        .sort((a, b) => a.localeCompare(b, 'zh'))
+        .map((f) => path.join(SUBS, f));
+    } else {
+      files = SUBS.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    if (!files.length) { console.log('❌ --subs 没找到任何图片: ' + SUBS); process.exit(1); }
+    newSubs = [];
+    for (const f of files) {
+      if (!fs.existsSync(f)) { console.log('❌ 副图不存在: ' + f); process.exit(1); }
+      const buf = await sharp2(fs.readFileSync(f)).jpeg({ quality: 92 }).toBuffer();
+      const meta = await sharp2(buf).metadata();
+      const u = await post2('/api/agent/upload-image', { store: STORE, imageB64: buf.toString('base64') }, 180000);
+      if (!u.ok || !u.url) { console.log('❌ 副图上传失败: ' + path.basename(f) + ' ' + (u.error || '')); process.exit(1); }
+      newSubs.push({ extraInfo: { isH: 'false', isT: 'false', raw: 'false' }, isQrCode: false, url: u.url,
+        heightSize: String(meta.height), widthSize: String(meta.width), major: 'false', type: '0', status: 'done' });
+      console.log('副图 ✅ ' + path.basename(f) + '  ' + meta.width + 'x' + meta.height);
+    }
+  }
+
   // ⚠️ 类型必须与 editdetail 回包一致：major / type / width / height 全是【字符串】
   //    传 boolean → mtop 回 `ABORT::接口异常退出`（2026-11-11 实测踩到）
   const toDo = (o, isMajor) => ({
@@ -172,11 +201,12 @@ if (MAIN) console.log('新主图: ' + MAIN); else console.log('新主图: 不改
     major: isMajor ? 'true' : 'false', type: String(o.type != null ? o.type : 0), status: 'done'
   });
   const imgList = (newMajor ? [newMajor] : majors.map(m => toDo(m, true)))
-    .concat(others.map(o => toDo(o, false)));
+    .concat(newSubs ? newSubs : others.map(o => toDo(o, false)));
 
   console.log('\n── 改后 ──');
   console.log('标题: ' + finalTitle);
-  console.log('图: 主图 1 + 副图 ' + others.length + '（共 ' + imgList.length + ' 张）');
+  console.log('图: 主图 1 + 副图 ' + (newSubs ? newSubs.length : others.length) + '（共 ' + imgList.length + ' 张）' +
+    (newSubs ? '  ← 副图整组已更换' : ''));
 
   if (!GO) { console.log('\n[未加 --go] 只预览，不写线上'); return; }
 
