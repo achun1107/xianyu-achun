@@ -49,9 +49,20 @@ function findZip() {
 
 const ZIP = findZip();
 if (!ZIP || !fs.existsSync(ZIP)) {
-  console.log('❌ 找不到分发包。先跑：');
-  console.log('   node tools/make-release.js      （打三个仓）');
-  console.log('   node tools/_build-install-bundle.js   （合成学员包）');
+  console.log('');
+  console.log('❌ 找不到分发包。');
+  console.log('');
+  console.log('   ⚠️ 这个脚本是【给技术负责人】用的，不是学员工具。');
+  console.log('      学员不需要跑它 —— 装完之后双击「启动.cmd」打开网页就行。');
+  console.log('');
+  console.log('   它要在打包机上跑，且先要有分发包：');
+  console.log('      node tools/make-release.js             （打三个仓）');
+  console.log('      node tools/_build-install-bundle.js    （合成学员包）');
+  console.log('      node tools/verify-student-view.js      （再回来验）');
+  console.log('');
+  console.log('   或者直接指定一个已有的包：');
+  console.log('      node tools/verify-student-view.js --zip=<某个 xianyu-install-*.zip>');
+  console.log('');
   process.exit(2);
 }
 
@@ -333,11 +344,16 @@ const check = (name, ok, detail) => {
       ];
       const badCmds = [];
       let cmdCount = 0;
-      // 这两个是【维护者文档里提到、但不在 xianyu-achun 包里】的：
+      // 这几个是【维护者文档里提到、但不在 xianyu-achun 包里】的：
       //   _build-install-bundle.js —— 打包脚本，只在开发机上有（make-release 不把它发出去）
+      //   make-release.js —— 同上，第 114 轮也排掉了（学员用不到，里面有本机路径）
       //   server.js —— 在 xianyu-playwright-service 里，是另一个仓库的入口
       // 它们在管理员手册里出现是正常的，不该报"缺"。
-      const NOT_IN_ACHUN = new Set(['tools/_build-install-bundle.js', 'server.js']);
+      const NOT_IN_ACHUN = new Set([
+        'tools/_build-install-bundle.js',
+        'tools/make-release.js',
+        'server.js',
+      ]);
       for (const rel of DOCS) {
         const dp = path.join(root, rel.split('/').join(path.sep));
         if (!fs.existsSync(dp)) continue;

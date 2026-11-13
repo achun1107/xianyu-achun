@@ -95,10 +95,15 @@ function main() {
       : [];
     const zips = all.map((x) => x.f);
     if (!zips.length) {
-      console.log('  找到的目录: ' + rel);
+      console.log('');
+      console.log('  ⚠️ 这个脚本是【给技术负责人】用的，不是学员工具。');
+      console.log('     学员不需要跑它。');
+      console.log('');
+      console.log('  找的目录: ' + rel);
       console.log('  里面没有 xianyu-install-*.zip');
       console.log('  → 手动指定：node tools/scan-package.js <解压目录>');
       console.log('  → 或设环境变量：set XY_RELEASE_DIR=D:\\xianyu-release');
+      console.log('');
       process.exit(2);
     }
     const zip = path.join(rel, zips[0]);   // 已按 mtime 倒序

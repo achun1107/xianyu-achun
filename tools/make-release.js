@@ -203,6 +203,14 @@ function excluded(rel) {
   //   里面写死了老板的 itemId，学员双击/运行只会报错。
   /^ad-[\w-]+\.js$/,
   /^(pause|resume|stop|start)-[\w-]+\.js$/,
+  // 【2026-11-13 加·第十二批】打包工具本身。第 114 轮扫 tools\ 时发现它还在包里：
+  //   make-release.js 是"打三个仓 + 生成 zip"的工具，只在打包机上跑。
+  //   学员拿到它没有任何用途，而且它里面有 D:\xianyu-release / D:\xianyu-public 这些
+  //   本机路径，跑了必然报错。
+  //   （verify-student-view.js 和 _syntax-check-all.js 保留 —— 技术负责人
+  //     拿到包之后可以用它们复核，而且它们找不到包时会自己说明"这是给技术负责人用的"。）
+  /^tools\/make-release\.js$/,
+  /^make-release\.js$/,
   ];
   return rules.some((r) => r.test(f));
 }
