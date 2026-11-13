@@ -368,7 +368,36 @@ const check = (name, ok, detail) => {
       htmlBad.length ? htmlBad.slice(0, 2).join(' | ') : htmlFiles.length + ' 个 HTML / ' + totalBlocks + ' 块脚本');
   }
 
-  // ── ⑪ 汇总 ──
+  // ── ⑪ staff-ui 页面的 id 引用完整性 ──
+  //   为什么加（2026-11-13）：语法对了不等于运行时不炸。
+  //   ui.html 里 JS 通过 getElementById('x') / val('x') 拿元素，
+  //   如果 HTML 里那个 id 不存在 → 返回 null → 调用 .value 时抛
+  //     TypeError: Cannot read properties of null
+  //   学员看到的是「点了按钮没反应」，控制台里才有这句。
+  //   这条检查是我用 ego 真的打开页面、连续调 refreshOnboard/refreshStoreLabel 之后
+  //   想到的：那一步能验到运行时，但它依赖浏览器环境，进不了这个脚本；
+  //   而「引用的 id 存不存在」是纯静态就能查的，覆盖了同一类故障。
+  console.log('\n⑪ staff-ui 页面的 id 引用');
+  {
+    const uiPath = path.join(achun, 'tools', 'staff-ui', 'ui.html');
+    if (!fs.existsSync(uiPath)) {
+      check('staff-ui/ui.html 存在', false);
+    } else {
+      const html = fs.readFileSync(uiPath, 'utf8');
+      const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map(m => m[1]));
+      const refs = new Set();
+      for (const m of html.matchAll(/getElementById\('([^']+)'\)/g)) refs.add(m[1]);
+      for (const m of html.matchAll(/\bval\('([^']+)'\)/g)) refs.add(m[1]);
+      for (const m of html.matchAll(/querySelector\('#([^']+)'\)/g)) refs.add(m[1]);
+
+      const missingIds = [...refs].filter(x => !ids.has(x));
+      check('JS 引用的 id 在 HTML 里都存在', missingIds.length === 0,
+        missingIds.length ? '缺: ' + missingIds.slice(0, 4).join(', ')
+                          : ids.size + ' 个 id / ' + refs.size + ' 个引用');
+    }
+  }
+
+  // ── ⑫ 汇总 ──
   const bad = results.filter(r => !r.ok);
   console.log('\n════ 结果 ════');
   console.log('  ' + (results.length - bad.length) + '/' + results.length + ' 通过');
