@@ -159,7 +159,7 @@ xianyu-monitor 仓库：D:\xianyu\xianyu-monitor
 
 ```powershell
 node tools\store-ready.js "你的店铺名"
-node tools\store-login.js "你的店铺名" --wait=15
+node tools\store-login.js "你的店铺名" --wait=15     # 15 = 分钟（默认 10）
 ```
 
 **人要做的**：按提示**扫码 + 过滑块 + 输短信验证码**。登录态存在本机，之后不用反复登。

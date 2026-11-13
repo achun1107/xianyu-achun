@@ -45,7 +45,7 @@ async function evalOnStore(code, timeoutMs) {
 }
 
 const NAME = process.argv[2];
-if (!NAME || NAME.startsWith('--')) { console.log('用法: node tools/store-login.js "<店铺名>" [--wait=10]'); process.exit(2); }
+if (!NAME || NAME.startsWith('--')) { console.log('用法: node tools/store-login.js "<店铺名>" [--wait=10]   # 10 = 分钟（默认 10）'); process.exit(2); }
 const argOf = (k, d) => { const a = process.argv.find((x) => x.startsWith('--' + k + '=')); return a ? Number(a.split('=')[1]) : d; };
 const WAIT_MIN = argOf('wait', 10) || 10;
 
