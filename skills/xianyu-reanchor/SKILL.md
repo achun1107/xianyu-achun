@@ -290,8 +290,25 @@ FAIL_BIZ_ITEM_CONDITION_NOT_SUPPORT_SIGN::未开通服务或当前品类不支�
 |---|---|
 | `tools/item-traffic.js` | 按浏览量给在售链接排序（选链接的第一步） |
 | `tools/apply-item.js` | 按给定内容重写已发布商品（主图/标题/正文/所在地） |
-| `tools/replace-item.js` | 按模板自动推导标题正文并重写（含 `--main-only` 只换图） |
+| `tools/replace-item.js` | 按模板自动推导标题正文并重写（含 `--main-only` 只换图、`--subs=<目录>` 整组换副图、`--addr-city=<城市>` 顺带改所在地，**一次 edit 改全**） |
+| `tools/set-item-addr.js` | 只改所在地（不动标题/图/类目/规格） |
+| `tools/make-subimgs.js` | 出本店口径副图（场次信息/可信承诺/贴纸，参数化：`--title --date --venue --platform`） |
 | `tools/cat-audit.js` | 逐条查真实分类，核对改造有没有动坏类目 |
 | `tools/ad-power.js` | 单计划开关（重锚完要不要挂推广） |
 | `lib/title.js` | 30 字硬上限与补位的唯一实现 |
 | `stores/<店铺>.json` | 分类 / 规格 / 价格 / 主图池 / 推广 9 项的唯一配置出口 |
+
+### 七点一、一次 edit 改全（2026-11-13 实测省一半往返）
+
+老链接换场次经常要连改四五样：标题、主图、副图、所在地、补规格。
+**分成多次 edit = 多轮审核 + 多次模型往返**。现在 `replace-item.js` 一次全带：
+
+```powershell
+node tools/replace-item.js <itemId> 深圳 王琳凯 演唱会 首开 `
+  --tpl=3 --main="<新主图>" --subs="publish-assets/<店>/副图" --addr-city=深圳 --go
+```
+
+- `--subs` 会把副图整组替换（不给就保留线上原样）
+- `--addr-city` 顺带把 `itemAddrDTO` 改到该城市（区池见 `lib/city-areas.json`）
+- 无规格老链接会自动补一档规格（否则编辑接口回 `FAIL_BIZ_UN_...闲鱼太累啦～`）
+- 回读校验：标题一致 / 主图尺寸 / 副图张数 / 规格 / 所在地
