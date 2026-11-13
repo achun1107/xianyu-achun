@@ -359,6 +359,12 @@ const check = (name, ok, detail) => {
         'tools/_build-install-bundle.js',
         'tools/make-release.js',
         'server.js',
+        // 【2026-11-13 第 134 轮加】这两个是【发包工具】，只在打包机上跑：
+        //   _sync-public.js    —— 把代码同步到公开仓
+        //   publish-package.js —— 把 zip 发到 gh-pages（第 134 轮新加的）
+        // 管理员手册里写它们是对的（那是给维护者看的）。
+        'tools/_sync-public.js',
+        'tools/publish-package.js',
       ]);
       for (const rel of DOCS) {
         const dp = path.join(root, rel.split('/').join(path.sep));

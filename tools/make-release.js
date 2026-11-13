@@ -230,6 +230,9 @@ function excluded(rel) {
   //   学员不会用，而且 --dry 保护并不完整。
   /^tools\/(publish-schedule|publish-4groups|republish-bad|sheet-command-runner)\.js$/,
   /^(publish-schedule|publish-4groups|republish-bad|sheet-command-runner)\.js$/,
+  // 【2026-11-13 加·第十四批】第 134 轮新加的发包工具。它在打包机上把 zip 发到 gh-pages，
+  //   学员拿到没有任何用途（里面有 GH_TOKEN / gh-pages 分支名 / 固定仓库路径）。
+  /^tools\/publish-package\.js$/,
   ];
   return rules.some((r) => r.test(f));
 }
