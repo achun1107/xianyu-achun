@@ -26,10 +26,11 @@ const GET = (k, d) => { const a = argv.find((x) => x.startsWith('--' + k + '='))
 const STORE = GET('store', '超能水手代拍');
 const CITY = GET('city', '北京');
 const STAR = GET('star', '双高胎');
-const DATE = GET('date', '11/29');
-const TIMES = GET('times', '14:30 / 19:30');
-const VENUE = GET('venue', '北京 微博in·钻石中心');
-const PLATFORM = GET('platform', '微博购 / 猫眼演出');
+const TITLE = GET('title', '');                     // 活动全名，例：麻辣王子年轻之夜
+const DATE = GET('date', '');
+const TIMES = GET('times', '');
+const VENUE = GET('venue', '');
+const PLATFORM = GET('platform', '');
 
 const W = 1104, H = 1472;
 const BASE = path.join(ROOT, 'publish-assets', STORE, '底图', 'base-gold.jpg');
@@ -84,14 +85,13 @@ async function compose(baseBuf, layers) {
   fs.mkdirSync(OUT, { recursive: true });
   const baseBuf = fs.readFileSync(BASE);
 
-  // ① 场次信息卡
+  // ① 场次信息卡（空字段自动跳过，标题用 --title，没给就用「城市+明星」）
   const bar = topBar(CITY + STAR);
-  const card = infoCard([
-    { t: '双高胎2026「嗨皮高高Day」新喜剧专场', size: 'big', color: '#FFD400' },
-    { t: '演出时间  ' + DATE + '  ' + TIMES },
-    { t: '演出场馆  ' + VENUE },
-    { t: '购票平台  ' + PLATFORM },
-  ], { top: 0 });
+  const lines = [{ t: TITLE || (CITY + STAR), size: 'big', color: '#FFD400' }];
+  if (DATE || TIMES) lines.push({ t: '演出时间  ' + [DATE, TIMES].filter(Boolean).join('  ') });
+  if (VENUE) lines.push({ t: '演出场馆  ' + VENUE });
+  if (PLATFORM) lines.push({ t: '购票平台  ' + PLATFORM });
+  const card = infoCard(lines, { top: 0 });
   const info1 = await compose(baseBuf, [Object.assign({}, bar, { top: 120 }), Object.assign({}, card, { top: 340 })]);
   fs.writeFileSync(path.join(OUT, '副图1-场次信息.jpg'), info1);
 

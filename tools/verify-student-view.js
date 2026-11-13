@@ -268,6 +268,23 @@ const check = (name, ok, detail) => {
     }
     check('guide 里的 --参数脚本都认', flagProblems.length === 0,
       flagProblems.length ? flagProblems.slice(0, 3).join(' | ') : cmds.length + ' 条命令');
+
+    // ⑤ guide 里点名引用的文件，包里必须真的有
+    //   为什么加（2026-11-13）：install-guide.html 里写着「包里 xianyu-achun\\学员常见错误速查.md」，
+    //   但那个文件【从未被 git 跟踪】—— make-release 从 git ls-files 打包，自然就没有它。
+    //   学员按提示去找，找不到。这类问题 ①~④ 都抓不到：它们验的是"包里有的东西对不对"，
+    //   不验"该有的东西有没有"。
+    //
+    //   只查【带 xianyu-achun\\ 前缀】的 .md 引用 —— 不带前缀的一律不查，
+    //   因为 guide 里还有 `Node.js`（产品名）、`local.js`（被正则截断的 config.local.json）这类误报。
+    {
+      const refRe = /xianyu-achun\\([\w\u4e00-\u9fa5.-]+\.md)/g;
+      const wanted = [...html.matchAll(refRe)].map((m) => m[1]);
+      const uniq = [...new Set(wanted)];
+      const gone = uniq.filter((f) => !fs.existsSync(path.join(achun, f)));
+      check('guide 引用的 .md 文件都在包里', gone.length === 0,
+        gone.length ? '缺: ' + gone.join(', ') : uniq.length + ' 个引用');
+    }
   }
 
   // ── ⑧ 扩展代码（monitor）的语法检查 ──
