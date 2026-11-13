@@ -173,9 +173,24 @@ function sectionStores() {
       const b = path.isAbsolute(bi) ? bi : path.join(ROOT, bi);
       if (!fs.existsSync(b)) issues.push('主图底图不存在（' + bi + '）');
     }
-    if (issues.length) rowsS1.push({ level: 'bad', name: n, detail: issues.join('；'), fix: 'node tools/store-init.js "' + n + '" --verify' });
-    else rowsS1.push({ level: 'ok', name: n, detail: '¥' + P.价格.default + ' / 库存' + P.库存.default + ' / ' + P.发货方式.shipMode +
-      ' / 规格 ' + specs.length + ' 档 / ' + (P.status === 'draft' ? '草稿' : '正常') });
+    // 【2026-11-13 改】草稿店（status=draft）的素材缺失降级成 warn。
+    //   为什么：草稿店本来就是"还没备齐料"的状态 —— 副图目录、底图文件不存在是正常的
+    //   （store-init.js 早就这么处理了，healthcheck 没跟上，两边不一致）。
+    //   后果：好易美娱乐一个草稿店让整个体检 bad=1、退出码 1，
+    //   网页上顶着一个红叉，学员/老板看不出"这其实不用管"。
+    //   真正的配置错误（缺 accountId / 缺分类 / 规格为空 / 推广九项不合法）仍然算 bad。
+    const isDraft = P.status === 'draft';
+    if (issues.length) {
+      rowsS1.push({
+        level: isDraft ? 'warn' : 'bad',
+        name: n + (isDraft ? '（草稿店）' : ''),
+        detail: issues.join('；') + (isDraft ? ' —— 草稿店，备齐素材后把 status 改成 live' : ''),
+        fix: 'node tools/store-init.js "' + n + '" --verify',
+      });
+    } else {
+      rowsS1.push({ level: 'ok', name: n, detail: '¥' + P.价格.default + ' / 库存' + P.库存.default + ' / ' + P.发货方式.shipMode +
+        ' / 规格 ' + specs.length + ' 档 / ' + (P.status === 'draft' ? '草稿' : '正常') });
+    }
 
     // 推广九项
     try {
