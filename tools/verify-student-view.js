@@ -365,6 +365,12 @@ const check = (name, ok, detail) => {
         // 管理员手册里写它们是对的（那是给维护者看的）。
         'tools/_sync-public.js',
         'tools/publish-package.js',
+        // 【2026-11-13 第 136 轮加】第 136 轮排掉了这两个（学员跑会看到假的「有修复被覆盖了」）：
+        //   regression-check.js —— 查源码历史修复，读发布目录
+        //   scan-package.js     —— 读 D:\xianyu-release 里的 zip
+        // 管理员手册里写它们是对的（给维护者看的）。
+        'tools/regression-check.js',
+        'tools/scan-package.js',
       ]);
       for (const rel of DOCS) {
         const dp = path.join(root, rel.split('/').join(path.sep));

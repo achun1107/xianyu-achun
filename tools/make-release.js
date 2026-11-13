@@ -237,6 +237,16 @@ function excluded(rel) {
   //   而 xianyu-achun 这个仓【没有 package.json】—— 学员机器上装了也跑不起来。
   //   它是维护者工具（把一页纸截成图贴群用），不该进包。
   /^tools\/shot-one-pager\.js$/,
+  // 【2026-11-13 加·第十六批】第 136 轮实测：这两个进包之后，学员好奇跑一下会报红。
+  //   regression-check.js —— 查的是「开发机上历史修复还在不在」，读的是源码和发布目录；
+  //                          在包里跑 = 「31 通过 / 7 失败 · 有修复被覆盖了」，
+  //                          学员看到会以为装坏了（实际什么都没坏，只是它查不到该查的东西）。
+  //   scan-package.js     —— 要读 D:\xianyu-release 里的 zip，包里没有那个目录。
+  // 这两个纯粹是维护者工具，学员一个都用不到。
+  // （verify-student-view.js 和 _syntax-check-all.js 保留 —— 技术负责人拿到包后能复核；
+  //   而且 verify 找不到包时会明确说「这个脚本是给技术负责人用的，不是学员工具」。）
+  /^tools\/regression-check\.js$/,
+  /^tools\/scan-package\.js$/,
   ];
   return rules.some((r) => r.test(f));
 }
