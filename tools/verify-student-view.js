@@ -397,7 +397,55 @@ const check = (name, ok, detail) => {
     }
   }
 
-  // ── ⑫ 汇总 ──
+  // ── ⑫ 前端 ↔ 后端的跨文件一致性 ──
+  //   两件（2026-11-13 加）：
+  //   ① 前端 apiFetch('/api/xxx') 调的接口，server.js 里有没有实现？
+  //      没实现 = 点了按钮一直转圈或 404，学员以为是"卡住了"。
+  //   ② onclick="xxx()" 里的函数，ui.html 的 js 里有没有定义？
+  //      没定义 = ReferenceError，点了没反应。
+  //   这两条都是【跨文件】的 —— 单个文件语法全对，组合起来才出问题。
+  console.log('\n⑫ 前端 ↔ 后端一致性');
+  {
+    const uiPath = path.join(achun, 'tools', 'staff-ui', 'ui.html');
+    const srvPath = path.join(achun, 'tools', 'staff-ui', 'server.js');
+    if (!fs.existsSync(uiPath) || !fs.existsSync(srvPath)) {
+      check('staff-ui 的前后端文件都存在', false);
+    } else {
+      const ui = fs.readFileSync(uiPath, 'utf8');
+      const srv = fs.readFileSync(srvPath, 'utf8');
+
+      // ① 接口
+      const called = new Set([...ui.matchAll(/apiFetch\('(\/api\/[^'?]+)/g)].map(m => m[1]));
+      // 后端：把 server.js 里出现的所有 /api/xxx 字面量都算作"已实现"
+      //   （不管它是 p === '/api/x' 还是 p.match(/^\/api\/x\//)，
+      //    提取字面量比解析路由语法可靠 —— 第一版想匹配 p.match 的正则，转义层级搞错了）
+      // 先把源码里的正则转义 \/ 还原成 /，再提取 —— 否则
+      //   p.match(/^\/api\/task\/(\d+)$/) 里的 /api/task 一个都提不到
+      const srvNorm = srv.replace(/\\\//g, '/');
+      const defined = new Set([...srvNorm.matchAll(/\/api\/[a-z][a-z0-9-]*/g)].map(m => m[0]));
+      const noImpl = [...called].filter(c => {
+        if (defined.has(c)) return false;
+        // 动态路由：前端写 /api/task/（带尾斜杠），后端有 /api/task
+        if (c.endsWith('/')) return !defined.has(c.slice(0, -1));
+        return true;
+      });
+      check('前端调的接口后端都实现了', noImpl.length === 0,
+        noImpl.length ? '未实现: ' + noImpl.join(', ') : called.size + ' 个接口');
+
+      // ② onclick 里的函数
+      const onclickFns = new Set(
+        [...ui.matchAll(/on(?:click|change|input)="([a-zA-Z_$][\w$]*)\(/g)].map(m => m[1])
+      );
+      // 在 ui.html 的 js 里找 function xxx( / const xxx = / var xxx =
+      const definedFns = new Set();
+      for (const m of ui.matchAll(/(?:function\s+|const\s+|let\s+|var\s+)([a-zA-Z_$][\w$]*)\s*(?:\(|=)/g)) definedFns.add(m[1]);
+      const missingFns = [...onclickFns].filter(f => !definedFns.has(f));
+      check('onclick 里的函数都有定义', missingFns.length === 0,
+        missingFns.length ? '未定义: ' + missingFns.join(', ') : onclickFns.size + ' 个事件处理函数');
+    }
+  }
+
+  // ── ⑬ 汇总 ──
   const bad = results.filter(r => !r.ok);
   console.log('\n════ 结果 ════');
   console.log('  ' + (results.length - bad.length) + '/' + results.length + ' 通过');
