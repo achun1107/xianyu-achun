@@ -565,7 +565,33 @@ const check = (name, ok, detail) => {
       missingDocs.length ? missingDocs.join(', ') : REQUIRED_DOCS.length + ' 个文件');
   }
 
-  // ── ⑭ 汇总 ──
+  // ── ⑭ 核心模块能不能真的 require ──
+  //   为什么加（2026-11-13）：⑨ 组只用 vm.Script 做【语法解析】，
+  //   语法对不等于能加载 —— require 链上任何一环缺文件、循环依赖、ESM/CJS 混用，
+  //   都会在运行时抛错，而语法检查看不出来。
+  //   这一组在包内目录里真跑一次 require，验的是"加载得起来"。
+  console.log('\n⑭ 核心模块能 require');
+  {
+    const MODS = ['./lib/env', './lib/http', './lib/agent', './lib/store-profile', './lib/user-id', './lib/museav'];
+    const code = MODS.map((m) =>
+      "try{require(" + JSON.stringify(m) + ");console.log('OK')}catch(e){console.log('FAIL ' + e.message.split(String.fromCharCode(10))[0])}"
+    ).join(';');
+    let ok = true;
+    let detail = '';
+    try {
+      const r = execFileSync('node', ['-e', code],
+        { cwd: achun, encoding: 'utf8', timeout: 60000, stdio: 'pipe' });
+      const fails = r.split(/\r?\n/).filter((l) => l.startsWith('FAIL'));
+      if (fails.length) { ok = false; detail = fails[0].slice(5, 80); }
+      else detail = MODS.length + ' 个模块';
+    } catch (e) {
+      ok = false;
+      detail = String(e.stdout || e.message || '').split('\n')[0].slice(0, 80);
+    }
+    check('包内核心模块都能 require', ok, detail);
+  }
+
+  // ── ⑮ 汇总 ──
   const bad = results.filter(r => !r.ok);
   console.log('\n════ 结果 ════');
   console.log('  ' + (results.length - bad.length) + '/' + results.length + ' 通过');
