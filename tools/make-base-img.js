@@ -98,7 +98,7 @@ const outFile = path.join(outDir, 'base-' + (STYLE === 'custom' ? 'custom' : STY
   fs.mkdirSync(outDir, { recursive: true });
   console.log('\n店铺：' + STORE);
   console.log('风格：' + (STYLE === 'custom' ? '自定义' : STYLES[STYLE].name));
-  console.log('\n调 museav 中台出图（约 25-40 秒）…');
+  console.log('\n调 museav 中台出图（约 30-60 秒）…');
 
   // 1. 出图，museav 输出的是 URL
   //
@@ -118,8 +118,15 @@ const outFile = path.join(outDir, 'base-' + (STYLE === 'custom' ? 'custom' : STY
     if (m) url = m[0];
     else console.log(out);
   } catch (e) {
-    console.log('❌ museav 调用失败：' + (e.message || ''));
-    console.log('   检查：museav -V 能不能跑；没登录先 museav login');
+    // 2026-11-13 改：原来只说「没登录先 museav login」—— 学员根本没有中台账号，
+    //   也不知道 museav 是什么。先说清影响（不影响发布），再说怎么修。
+    console.log('❌ 生成专属底图失败：' + ((e && e.message) || e));
+    console.log('');
+    console.log('   影响：只影响这一张底图。主图会自动改用大麦官方海报，发布照常。');
+    console.log('   要修的话：');
+    console.log('     ① 先确认 museav 装了：museav -V');
+    console.log('     ② 没登录过就登录：museav login  （需要中台账号，找管理员要）');
+    console.log('   不修也行，用大麦海报完全能发。');
     process.exit(1);
   }
   if (!url) { console.log('❌ 没从输出里找到图片 URL'); process.exit(1); }
