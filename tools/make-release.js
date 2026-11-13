@@ -266,6 +266,25 @@ function excluded(rel) {
   /^(dump-plan-items|find-plans|fix-dangling2|goto-manage|list-by-status)\.js$/,
   /^(make-cover-layers|push-redtext|read-msgs|restore-96129660|reveal-and-dump)\.js$/,
   /^(scan-buckets|set-bid|shot-items|sim-templates|stuck-plan|try-relist)\.js$/,
+  // 【2026-11-13 加·第十九批，第 139 轮】skills/ 目录。
+  //   第 113 轮 scan-package 扫到 skills/xianyu-reanchor/SKILL.md 里有 9 处真实 itemId；
+  //   第 139 轮细看发现它是【老板的高级操作技巧】——「把已有浏览量的老链接重新锚定到
+  //   新场次，吃掉它沉淀的检索权重」，属于业务方法论，还带店铺名和老板原话。
+  //   这和「票务业务-交底书」是同一类东西，不该随包发给学员。
+  /^skills\//,
+  // 【2026-11-13 加·第二十批，第 139 轮】两个带经营数据的 md：
+  //   上架审核流程-永久.md —— 老板 2026-10-10 原话 + 「深圳王者荣耀那批」的实测 itemId 与结果。
+  //      （它讲的「-9 = 审核中」这件事，4 份学员文档里都写过了，排掉不损失信息。）
+  //   主图参考-2026-10-11.md —— 老板 05:08 发的 10 张参考图清点 + 一整张场次投放表
+  //      （南宁许嵩 / 贵阳王力宏 + itemId + 计划 id + 投放状态）。
+  /^(上架审核流程-永久|主图参考-2026-10-11)\.md$/,
+  // 【2026-11-13 加·第二十一批，第 139 轮】presets/ 里那个"从好易美导出"的原始样板。
+  //   presets/ 有两个文件：
+  //     代拍-标准.json            ← 学员要用的标准样板（向导读它），保留
+  //     代拍-参考-从好易美导出.json ← 从老板店里导出的原始档（4 个真实 itemId + 店铺名 +
+  //                                 publish-assets/好易美代拍/副图-第二组 这种本机路径），排掉
+  //   文件名里就写着"从好易美导出"，一眼能看出来是原始档不是样板。
+  /^presets\/代拍-参考-从好易美导出\.json$/,
   ];
 
   // ── tools/ 下的 .js 走【白名单】而不是黑名单 ──
