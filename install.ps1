@@ -94,7 +94,16 @@ function Mask($s) { if (-not $s) { return '' }; if ($s.Length -le 8) { return '*
 function Run([string]$Exe, [string[]]$ArgList, [string]$Why) {
     if ($DryRun) { Info ('[DryRun] ' + $Exe + ' ' + ($ArgList -join ' ') + '    # ' + $Why); return 0 }
     Info ($Why + ' -> ' + $Exe + ' ' + ($ArgList -join ' '))
-    & $Exe @ArgList 2>&1 | ForEach-Object { Write-Host ('         ' + $_) }
+    & $Exe @ArgList 2>&1 | ForEach-Object {
+        $s = "$_"
+        # 【2026-11-14 第 157 轮】node 在【有代理】的机器上会打这两行英文技术噪音：
+        #     (node:xxx) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental...
+        #     (Use `node --trace-warnings ...` to show where the warning was created)
+        # 学员看不懂，而且它真正想说的事（"你开了代理"）上面 1b 节已经用中文讲清楚了，
+        # 所以这里直接滤掉 —— 只滤这几行，其它警告照常显示。
+        if ($s -match 'UNDICI-|ExperimentalWarning|trace-warnings') { return }
+        Write-Host ('         ' + $s)
+    }
     return $LASTEXITCODE
 }
 
@@ -155,6 +164,30 @@ if (-not $SkipDeps) {
         Write-Host '         处理：如果你拿的是完整 zip（解压出来就有三个目录），忽略这条即可。'
         Write-Host '               如果只有 xianyu-achun 一个目录，去找管理员要完整包。'
     }
+}
+
+# ── 1b. 代理（2026-11-14 第 157 轮加）─────────────────────────────
+# 为什么加：《发放说明》第一节就要求「装之前先关掉 VPN / 系统代理」，
+#   但安装器从来没验过这件事。有代理时会同时出两个症状，而且都不好懂：
+#     ① node 的 fetch 打一行英文 experimental warning 到屏幕上
+#        （(node:xxx) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental...）
+#     ② 装完闲鱼连不上 —— 学员只看到「浏览器一直转圈」，根本想不到是代理
+#   所以在这里【提前用中文说清楚】，比事后排查省事。
+# 只警告不拦截：有人确实要走代理装，那让他自己承担后果，别替他决定。
+$proxyEnv = @($env:HTTP_PROXY, $env:HTTPS_PROXY, $env:http_proxy, $env:https_proxy) |
+    Where-Object { $_ -and $_.Trim() }
+$inetProxy = $null
+try {
+    $k = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -ErrorAction SilentlyContinue
+    if ($k -and $k.ProxyEnable -eq 1) { $inetProxy = $k.ProxyServer }
+} catch { }
+if ($proxyEnv -or $inetProxy) {
+    $p = if ($proxyEnv) { ($proxyEnv | Select-Object -First 1) } else { $inetProxy }
+    Warn ('检测到代理：' + $p)
+    Write-Host '         《发放说明》第一步就要求「装之前先关掉 VPN / 系统代理」。'
+    Write-Host '         不关的后果：闲鱼连不上（浏览器一直转圈）、扫码登录会失败、出图取不到数。'
+    Write-Host '         关掉方法：退出 VPN 客户端；系统代理在 设置 → 网络和 Internet → 代理 里关。'
+    Write-Host '         （确定要用代理装的话可以继续，但出问题先想到它。）'
 }
 
 # ── 2. 依赖仓库（这里只定义函数，调用在第 4b 步）──────────────────
