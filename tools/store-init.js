@@ -45,6 +45,31 @@ if (!NAMES.length && !ALL) {
 }
 const TARGETS = ALL ? profile.list() : NAMES;
 
+// 【2026-11-13 加】点名的店没有档案时，直接说清楚「先跑向导」，别继续往下体检。
+//   为什么：没有档案时 profile.load() 会回落到 DEFAULTS，然后体检第一项就报
+//     ❌ 账号 accountId：没填
+//   学员看到的是「账号没填」，会去想"去哪儿填账号"—— 而真正该做的是先跑五步向导。
+//   实测（第 99 轮，在解压包里跑）：包里只有 stores/_template.json，
+//   跑 store-init "任何店名" 都是这个 ❌，一句话都没提向导。
+{
+  const noProfile = TARGETS.filter((n) => !profile.exists(n));
+  if (noProfile.length) {
+    console.log('');
+    console.log('❌ 这些店还没有自己的档案（stores/<店名>.json）：' + noProfile.join('，'));
+    console.log('');
+    console.log('   档案是这家店的唯一真相源（价格/规格/版式/文案/广告都在里面）。');
+    console.log('   没有档案时所有检查都会拿通用默认值去比，报出来的问题没意义。');
+    console.log('');
+    console.log('   先跑向导把它建出来（五步，约 3 分钟）：');
+    noProfile.forEach((n) => console.log('        node tools\\store-wizard.js "' + n + '"'));
+    console.log('   或者打开网页，点「⑤ 配置一家新店」。');
+    console.log('');
+    console.log('   现有档案: ' + (profile.list().join(' / ') || '（一个都没有）'));
+    console.log('');
+    process.exit(2);
+  }
+}
+
 const ROWS = [];
 const chk = (level, name, detail) => ROWS.push({ level: level, name: name, detail: detail || '' });
 const tag = (l) => (l === 'ok' ? '✅' : l === 'warn' ? '⚠️' : '❌');
