@@ -140,12 +140,44 @@ function main() {
     pProblems.slice(0, 4).forEach((l) => console.log('          ' + l.trim().slice(0, 90)));
   }
 
+  // ── [4] 跑【配置模板】那一步：store-wizard --dry ──
+  //   为什么加（第 156 轮）：目标是「学员配好自己的模板 → 输入城市明星 → 上架」。
+  //   前面三步验的是【装】和【发】，唯独没验【配】—— 而向导正是⑤「配置一家新店」的入口。
+  //   它一条链上验了四件事：8093 账号表读得到、museav 能出图、按底图主色推荐版式、
+  //   档案能拼出来（--dry 只不落盘）。
+  //   输入喂一行店名，后面的步骤读到 EOF 就走默认值 —— 实测能一路跑完五步。
+  console.log('\n  [4] 在包内跑 store-wizard --dry（配置模板那一步）');
+  let wOut = '';
+  try {
+    wOut = execFileSync('node', [path.join('tools', 'store-wizard.js'), '--dry'],
+      { cwd: achun, encoding: 'utf8', timeout: 180000, stdio: 'pipe', input: '冒烟测试店\n' });
+  } catch (e) {
+    wOut = String((e.stdout || '') + (e.stderr || ''));
+  }
+  const wSteps = {
+    账号表: /8093 里的闲鱼账号/.test(wOut),
+    出图: /底图：|出图中/.test(wOut),
+    版式推荐: /推荐：/.test(wOut),
+    档案预览: /将要写入档案/.test(wOut),
+    dry标注: /\[--dry\] 不写档案/.test(wOut),
+  };
+  Object.entries(wSteps).forEach(([k, v]) => console.log('      ' + (v ? '✅' : '❌') + ' ' + k));
+  const wProblems = wOut.split(/\r?\n/).filter((l) =>
+    /^(❌|Error:|TypeError|ReferenceError)/.test(l.trim())
+    && !/还没装依赖|依赖未安装/.test(l));
+  if (wProblems.length) {
+    console.log('      ❌ 意料之外的报错 ' + wProblems.length + ' 行:');
+    wProblems.slice(0, 4).forEach((l) => console.log('          ' + l.trim().slice(0, 90)));
+  }
+
   if (!KEEP) fs.rmSync(tmp, { recursive: true, force: true });
   else console.log('\n      临时目录保留: ' + tmp);
 
   console.log('');
-  if (unexpected.length || pProblems.length) {
-    console.log('  ❌ 有 ' + (unexpected.length + pProblems.length) + ' 项意料之外的失败 —— 这个包发出去学员会卡住');
+  const wFailed = Object.values(wSteps).filter((v) => !v).length;
+  if (unexpected.length || pProblems.length || wProblems.length || wFailed) {
+    const n = unexpected.length + pProblems.length + wProblems.length + wFailed;
+    console.log('  ❌ 有 ' + n + ' 项意料之外的失败 —— 这个包发出去学员会卡住');
     console.log('');
     process.exit(1);
   }
