@@ -39,7 +39,7 @@
 ```bash
 git clone <this repo>
 cd xianyu-achun
-npm install
+# 不需要 npm install —— 核心代码零第三方依赖，全是 Node 内置模块
 node tools/verify-student-view.js    # 28 项自检
 ```
 
@@ -113,12 +113,12 @@ skills/       复用的技能包
 
 ## 依赖
 
-| 依赖 | 用途 |
-|---|---|
-| Node.js 18+ | 运行时 |
-| `xianyu-playwright-service`（独立仓） | 8093 端口，管登录态和浏览器 |
-| `xianyu-monitor`（独立仓） | 发布与广告的执行层 |
-| museav CLI（可选） | 出专属底图；没有就用大麦底图 |
+| 依赖 | 必需? | 用途 |
+|---|---|---|
+| Node.js 18+ | **必需** | 运行时。核心代码零第三方依赖 |
+| `xianyu-playwright-service`（独立仓） | **必需** | 8093 端口，管登录态和浏览器 |
+| `xianyu-monitor`（独立仓） | **必需** | 发布与广告的执行层；少了发布静默失败 |
+| museav CLI | 可选 | 出专属底图；没有就用大麦底图 |
 
 **三个目录必须并排**：
 
