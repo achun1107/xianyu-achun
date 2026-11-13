@@ -698,6 +698,62 @@ const check = (name, ok, detail) => {
       extra.length ? extra.slice(0, 3).map((x) => x.rel).join(' | ') : found.length + ' 个脚本');
   }
 
+  // ── ⑭之二 tools/ 下只应该有【学员工具】──
+  //   为什么加（2026-11-13 第 137 轮）：⑭ 组只覆盖了 .cmd/.bat/.ps1，
+  //   但【维护者工具全是 .js】—— 一天之内三次被它们混进包：
+  //     114 轮 verify-student-view.js（学员跑去看到「找不到分发包」）
+  //     120 轮 scan-package.js       （要读 D:\xianyu-release，包里没有）
+  //     136 轮 regression-check.js   （跑出「31 通过 / 7 失败 · 有修复被覆盖了」，最吓人）
+  //   每次都是「发现了才加一条排除规则」，所以这次改成白名单：
+  //   tools/ 下每个 .js 必须在这个名单里，否则报错。
+  console.log('\n⑭之二 tools/ 下只有学员工具');
+  {
+    const ALLOWED_JS = new Set([
+      // 建店 / 配店
+      'store-wizard.js', 'store-init.js', 'store-ready.js', 'store-login.js',
+      'store-new.js', 'store-list.js', 'store-bulk.js', 'store-audit.js',
+      'preset-export.js', 'install-config.js', 'install-tasks.js',
+      'dump-store-config.js', 'print-paths.js',
+      // 出图 / 文案
+      'make-base-img.js', 'rebuild-covers-and-desc.js',
+      // 上架 / 验证
+      'first-publish.js', 'publish-group.js', 'verify-published.js',
+      'probe-item-sku.js', 'set-item-sku.js',
+      // 推广
+      'ad-plan-create.js', 'ad-status.js', 'ad-window.js', 'set-ad-hours.js',
+      // 【2026-11-13 第 137 轮】这五个在学员文档里有明确用法（自查表 / 红线 / 错误速查）。
+      //   注意：这份名单必须和 make-release.js 里的 TOOLS_ALLOWED 保持一致，
+      //   否则就是「打包时留了、自检说没留」或者反过来。
+      'list-onsale.js', 'ad-review.js',
+      'probe-mtop-apis.js', 'probe-event-dup.js', 'ad-set-bid-budget.js',
+      // 体检 / 自检
+      'healthcheck.js', 'selftest-lib.js', 'selftest-update.js',
+      'verify-student-view.js',      // 技术负责人可用（找不到包时会说明）
+      '_syntax-check-all.js',        // 被 verify 调用
+      // 更新 / 编码
+      'update.js', 'utf8-check.js', 'scrub-secrets.js', 'today.js',
+      // staff-ui 自己的
+      'staff-ui/server.js', 'staff-ui/start.js',
+    ]);
+    const toolDir = path.join(achun, 'tools');
+    const bad = [];
+    (function rec(d) {
+      for (const name of fs.readdirSync(d)) {
+        if (name === 'node_modules' || name === '.git') continue;
+        const p = path.join(d, name);
+        const st = fs.statSync(p);
+        if (st.isDirectory()) { rec(p); continue; }
+        if (!/\.js$/.test(name)) continue;
+        const rel = path.relative(toolDir, p).replace(/\\/g, '/');
+        if (!ALLOWED_JS.has(rel)) bad.push(rel);
+      }
+    })(toolDir);
+    check('tools/ 下只有学员工具（白名单）', bad.length === 0,
+      bad.length
+        ? bad.slice(0, 5).join(' | ') + (bad.length > 5 ? ' …共 ' + bad.length + ' 个' : '')
+        : '白名单内');
+  }
+
   // ── ⑮ 核心模块能不能真的 require ──
   //   为什么加（2026-11-13）：⑨ 组只用 vm.Script 做【语法解析】，
   //   语法对不等于能加载 —— require 链上任何一环缺文件、循环依赖、ESM/CJS 混用，

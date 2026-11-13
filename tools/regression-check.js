@@ -261,6 +261,40 @@ has('tools/_install-guide.html.js', /先看这个-五步上手/, '106  详细版
     : ok('135  会 require 第三方模块的脚本已排掉（2 个）');
 }
 
+// ── 两份 tools 白名单必须一致 ──
+//   第 137 轮把 tools/ 下的 js 改成白名单（排掉 103 个老板工具）时，
+//   make-release.js 里一份、verify-student-view.js 里一份 —— 改了左边忘了右边，
+//   自检当场报「白名单里没有 ad-review.js」（其实打包时留了）。
+//   这条把两份比一遍。
+{
+  const mk = read('tools/make-release.js');
+  const vf = read('tools/verify-student-view.js');
+  const grab = (src, marker) => {
+    const i = src.indexOf(marker);
+    if (i < 0) return null;
+    const seg = src.slice(i, i + 4000);
+    const end = seg.indexOf(']);');
+    if (end < 0) return null;
+    return new Set([...seg.slice(0, end).matchAll(/'([\w.\-\/]+\.js)'/g)].map((m) => m[1]));
+  };
+  const a = grab(mk, 'const TOOLS_ALLOWED = new Set([');
+  const b = grab(vf, 'const ALLOWED_JS = new Set([');
+  if (!a || !b) {
+    console.log('  · 有一份白名单没找到，跳过一致性检查');
+  } else {
+    const onlyMk = [...a].filter((x) => !b.has(x));
+    const onlyVf = [...b].filter((x) => !a.has(x));
+    if (onlyMk.length || onlyVf.length) {
+      const parts = [];
+      if (onlyMk.length) parts.push('make-release 有、verify 没有: ' + onlyMk.slice(0, 4).join(', '));
+      if (onlyVf.length) parts.push('verify 有、make-release 没有: ' + onlyVf.slice(0, 4).join(', '));
+      bad('137  两份 tools 白名单一致', parts.join(' | '));
+    } else {
+      ok('137  两份 tools 白名单一致（' + a.size + ' 个）');
+    }
+  }
+}
+
 console.log('');
 console.log('  ─────────────');
 console.log('  ' + pass + ' 通过 / ' + fail + ' 失败');

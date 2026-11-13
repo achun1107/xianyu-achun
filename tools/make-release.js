@@ -48,8 +48,7 @@ try {
  */
 function excluded(rel) {
   const f = rel.replace(/\\/g, '/');
-  if (f === 'stores/_template.json') return false;                 // 例外：建店模板要发
-  // 【2026-11-13 加】tools/_syntax-check-all.js 是【学员包里的 verify-student-view 要调用的】。
+  if (f === 'stores/_template.json') return false;                 // 例外：建店模板要发  // 【2026-11-13 加】tools/_syntax-check-all.js 是【学员包里的 verify-student-view 要调用的】。
   //   原来它被下面的「下划线开头 = 一次性脚本」规则排除，结果：
   //     · git 里加了（git add -f）→ 但 make-release 还是不带它
   //     · 包里 verify-student-view 的⑨组 execFileSync 调它 → ENOENT
@@ -248,8 +247,55 @@ function excluded(rel) {
   /^tools\/regression-check\.js$/,
   /^tools\/scan-package\.js$/,
   ];
+
+  // ── tools/ 下的 .js 走【白名单】而不是黑名单 ──
+  //   【2026-11-13 加·第十七批，第 137 轮】
+  //   上面那 16 批规则全是「发现一个排一个」，而 tools/ 下藏着 103 个老板的一次性工具
+  //   （probe-* 18 个、ad-* 11 个、fix-* 5 个、make-cover* 5 个、check-* 4 个、
+  //    test-* 4 个、apply-* 3 个……），黑名单永远列不完。
+  //   所以这里反过来：tools/ 下每个 .js 必须在下面的白名单里，不在就排掉。
+  //   要加学员工具就往这个 Set 里加一行 —— 忘了加会被自检 ⑭之二 报出来。
+  if (/^tools\/.+\.js$/.test(f)) {
+    const sub = f.slice('tools/'.length);
+    return !TOOLS_ALLOWED.has(sub);
+  }
+
   return rules.some((r) => r.test(f));
 }
+
+/** tools/ 下允许进包的 js（学员会用到的） */
+const TOOLS_ALLOWED = new Set([
+  // 建店 / 配店
+  'store-wizard.js', 'store-init.js', 'store-ready.js', 'store-login.js',
+  'store-new.js', 'store-list.js', 'store-bulk.js', 'store-audit.js',
+  'preset-export.js', 'install-config.js', 'install-tasks.js',
+  'dump-store-config.js', 'print-paths.js',
+  // 出图 / 文案
+  'make-base-img.js', 'rebuild-covers-and-desc.js',
+  // 上架 / 验证
+  'first-publish.js', 'publish-group.js', 'verify-published.js',
+  'probe-item-sku.js', 'set-item-sku.js',
+  // 推广
+  'ad-plan-create.js', 'ad-status.js', 'ad-window.js', 'set-ad-hours.js',
+  // 【2026-11-13 第 137 轮加】这两个在「学员装完该有的能力」自查表里（学员安装-给学员DSH.md L220/L223），
+  //   学员真会用：list-onsale 看这家店有哪些链接，ad-review 看推广计划。
+  //   第 137 轮改白名单时被漏掉，自检 ⑦ 组当场抓出来。
+  'list-onsale.js', 'ad-review.js',
+  // 【2026-11-13 第 137 轮加】这三个也是学员文档里明确教的：
+  //   probe-mtop-apis.js  —— 「想知道闲鱼某个接口能不能做」自查表
+  //   probe-event-dup.js  —— 「发布前先查重」，学员文档的红线第 6 条
+  //   ad-set-bid-budget.js —— 「单次成本超 ¥4 就降出价」，错误速查里的处置方法
+  //   （根层还有 16 个 probe-* 是老板的一次性探测脚本，不要一起放进来）
+  'probe-mtop-apis.js', 'probe-event-dup.js', 'ad-set-bid-budget.js',
+  // 体检 / 自检
+  'healthcheck.js', 'selftest-lib.js', 'selftest-update.js',
+  'verify-student-view.js',      // 技术负责人可用（找不到包时会自己说明）
+  '_syntax-check-all.js',        // 被 verify 调用
+  // 更新 / 编码 / 工具
+  'update.js', 'utf8-check.js', 'scrub-secrets.js', 'today.js',
+  // staff-ui 自己
+  'staff-ui/server.js', 'staff-ui/start.js',
+]);
 
 /**
  * 手机号检测 —— 必须带【数字边界】。
