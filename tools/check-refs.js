@@ -147,6 +147,25 @@ function main() {
         const baseHit = [...have].some((f) => f.split('/').pop() === name);
         if (!baseHit) problems.push({ file: rel, what: "readFileSync('" + name + "')", why: '包内找不到同名文件' });
       }
+
+      // ④ path.join(ROOT, 'tools', 'xxx.js') —— 子进程调用
+      //   【第 164 轮加】first-publish.js 用
+      //       run(NODE, [path.join(ROOT, 'tools', 'agent-reset.js'), '--help'])
+      //   当环境探针，而那个脚本被白名单排掉了 —— 于是每次发链接第一步打
+      //   「Error: Cannot find module '...agent-reset.js'」。
+      //   这种写法字符串里【没有 tools/ 前缀】（是拼出来的），所以上面几条都扫不到。
+      //
+      //   OPTIONAL = 调用方明确 try/catch 掉的「可选依赖」，缺了会走降级路径，
+      //   不算会崩。目前只有 feishu-alert.js：ad-window.js L100-105把它包在
+      //   try 里，缺了就退企微、再退桌面文件（飞书凭据本来就是运行时才有的）。
+      const OPTIONAL = new Set(['tools/feishu-alert.js']);
+      for (const m of t.matchAll(/path\.join\([^,]+,\s*['"]tools['"]\s*,\s*['"]([\w.\-]+\.js)['"]/g)) {
+        const target = 'tools/' + m[1];
+        if (have.has(target)) continue;
+        if (OPTIONAL.has(target)) continue;
+        if (problems.some((p) => p.file === rel && p.what.includes(target))) continue;
+        problems.push({ file: rel, what: target, why: 'path.join 调的子脚本不在包里（拼接写法，上面几条扫不到）' });
+      }
     }
 
     // ④ .ps1 / .cmd / .bat 里引用的 tools\xxx.js
@@ -184,7 +203,8 @@ function main() {
     console.log('');
     return 1;
   } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
+    // 同上：清理失败 ≠ 检查失败
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { console.log('  · 临时目录没清掉（句柄还占着），不影响结果: ' + e.message); }
   }
 }
 

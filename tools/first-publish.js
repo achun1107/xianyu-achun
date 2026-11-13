@@ -89,7 +89,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function run(cmd, args, opts) {
   try {
-    const out = execFileSync(cmd, args, Object.assign({ encoding: 'utf8', cwd: ROOT, maxBuffer: 32 * 1024 * 1024 }, opts || {}));
+    // stdio 必须显式给（第 164 轮实测）：默认情况下 execFileSync【既捕获又转发】
+    //   子进程的 stderr —— 于是 tools/agent-reset.js 不在包里时，这句虽然被
+    //   try/catch 吞了，屏幕上照样打出一坨英文：
+    //       node:internal/modules/cjs/loader:1572  throw err;  Error: Cannot find module ...
+    //   ['ignore','pipe','pipe'] = stdout/stderr 都捕获、都不往控制台漏。
+    const out = execFileSync(cmd, args, Object.assign(
+      { encoding: 'utf8', cwd: ROOT, maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] },
+      opts || {}));
     return { ok: true, out };
   } catch (e) {
     return { ok: false, out: String(e.stdout || '') + String(e.stderr || '') + '\n[exit] ' + e.message };

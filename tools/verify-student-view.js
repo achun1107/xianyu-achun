@@ -826,6 +826,10 @@ const check = (name, ok, detail) => {
       // 上架 / 验证
       'first-publish.js', 'publish-group.js', 'verify-published.js',
       'probe-item-sku.js', 'set-item-sku.js',
+      // 【第 164 轮】first-publish 拿它当环境探针；漏了它 = 每次发链接第一步甩英文
+      'agent-reset.js',
+      // 【第 164 轮】大麦场次查询（发链接核心）+ 封面重出（rebuild-covers 的依赖）
+      'damai-events.js', 'make-cover.js',
       // 推广
       'ad-plan-create.js', 'ad-status.js', 'ad-window.js', 'set-ad-hours.js',
       // 【2026-11-13 第 137 轮】这五个在学员文档里有明确用法（自查表 / 红线 / 错误速查）。

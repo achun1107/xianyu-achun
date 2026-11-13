@@ -172,7 +172,8 @@ function main() {
     console.log('');
     return 0;
   } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
+    // 同上：清理失败 ≠ 测试失败
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { console.log('  · 临时目录没清掉（句柄还占着），不影响结果: ' + e.message); }
   }
 }
 

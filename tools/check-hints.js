@@ -50,7 +50,8 @@ function scan() {
     })(A, 0);
     return { bad, stores, presets };
   } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
+    // 清临时目录失败（EPERM，句柄还没放）不该让检查本身判失败 —— make-release 一直是这么包的
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { console.log('  · 临时目录没清掉（句柄还占着），不影响结果: ' + e.message); }
   }
 }
 

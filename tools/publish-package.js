@@ -204,7 +204,8 @@ function info(msg) { console.log('      ·  ' + msg); }
       }
     }
   }
-  fs.rmSync(tmp, { recursive: true, force: true });
+  // 清理失败不该影响已经推成功的发布
+  try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { console.log('  · 临时目录没清掉（句柄还占着），不影响结果: ' + e.message); }
 
   // ── ⑦ 等 Pages 刷新 + 探活 ──
   step(6, '等 Pages 刷新（' + WAIT_SEC + ' 秒）然后探活');

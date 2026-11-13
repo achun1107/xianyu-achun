@@ -205,8 +205,16 @@ function main() {
     wProblems.push('带档案发时甩了 Cannot find module');
   }
 
-  if (!KEEP) fs.rmSync(tmp, { recursive: true, force: true });
-  else console.log('\n      临时目录保留: ' + tmp);
+  // 【第 163 轮修】清理失败不该让测试判失败：Windows 上子进程句柄没放完时
+  //   fs.rmSync 会 EPERM，于是「测试全过但清理崩了」→ 整个冒烟红 → build 报
+  //   「四道检查没过」→ 拒发。实测连续两次 build 都栽在这（standalone 跑能过，
+  //   因为负载不同、句柄释放得快）。清理是收尾动作，失败只提示。
+  if (!KEEP) {
+    try { fs.rmSync(tmp, { recursive: true, force: true }); }
+    catch (e) { console.log('  · 临时目录没清掉（句柄还占着），不影响结果: ' + e.message); }
+  } else {
+    console.log('\n      临时目录保留: ' + tmp);
+  }
 
   console.log('');
   const wFailed = Object.values(wSteps).filter((v) => !v).length;

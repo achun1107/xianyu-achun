@@ -285,6 +285,15 @@ function excluded(rel) {
   //                                 publish-assets/好易美代拍/副图-第二组 这种本机路径），排掉
   //   文件名里就写着"从好易美导出"，一眼能看出来是原始档不是样板。
   /^presets\/代拍-参考-从好易美导出\.json$/,
+  // 【2026-11-14 加·第二十二批，第 163 轮】make-covers.js —— 老板批量出主图的一次性脚本。
+  //   判据（手册第二节⑦ 的三问）：
+  //     ① 学员会打开它吗 —— 不会：9 份学员文档里一处没提
+  //     ② 打开会困惑吗   —— 会：它 require(xianyu-playwright-service/node_modules/playwright)，
+  //        而包里不带 node_modules，直接甩英文 Cannot find module
+  //        （第 162 轮全包扫裸 require，只剩这一处）
+  //     ③ 有内部信息吗   —— 有：文件头写着输出到 D:\DSH\achun\主图筛选-…
+  //   它唯一的调用方 gen-redtext-cover.js 第 138 轮已经排掉，包里没人引用它。
+  /^make-covers\.js$/,
   ];
 
   // ── tools/ 下的 .js 走【白名单】而不是黑名单 ──
@@ -322,6 +331,16 @@ const TOOLS_ALLOWED = new Set([
   // 上架 / 验证
   'first-publish.js', 'publish-group.js', 'verify-published.js',
   'probe-item-sku.js', 'set-item-sku.js',
+  // 【2026-11-14 第 164 轮加·回归修复】agent-reset.js 必须进包：
+  //   first-publish.js L130 拿它当「环境探针」跑（--help），
+  //   第 137 轮手写白名单时漏了它 → 包里没有 → 每次发链接第一步都打
+  //   「Error: Cannot find module '...tools\agent-reset.js'」。
+  //   它本身也是有用的：让浏览器只保留当前运营的店铺，省内存。
+  'agent-reset.js',
+  // 【第 164 轮】first-publish L158 调它查大麦场次 —— 发链接的核心一步，
+  //   漏了它 = 学员永远查不到场次。同批漏的还有 make-cover.js
+  //   （rebuild-covers-and-desc.js L66 调它重出封面）。
+  'damai-events.js', 'make-cover.js',
   // 推广
   'ad-plan-create.js', 'ad-status.js', 'ad-window.js', 'set-ad-hours.js',
   // 【2026-11-13 第 137 轮加】这两个在「学员装完该有的能力」自查表里（学员安装-给学员DSH.md L220/L223），
