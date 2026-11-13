@@ -90,4 +90,4 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     }
   }
   console.log('\n提示：--only=<子串> 过滤接口名；--dump 复用当前抓包不重新导航。');
-})().catch((e) => { console.log('❌ ' + ((e && e.stack) || e)); process.exit(1); });
+})().catch((e) => require('../lib/crash').crash(e, 1));

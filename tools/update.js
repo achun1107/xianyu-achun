@@ -579,4 +579,4 @@ function reportMiddle(ok, version, err) {
     else log('④ ⚠️ HEAD 没能跟到远端：' + rs.out + '（文件已更新，但下次还会报有更新）');
   }
   log('=== 更新完成（备份留在 _backup/' + stamp + '）===');
-})().catch((e) => { log('❌ ' + (e && e.stack || e)); process.exit(1); });
+})().catch((e) => require('../lib/crash').crash(e, 1));

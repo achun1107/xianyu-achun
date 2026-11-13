@@ -132,4 +132,4 @@ const CODE = `
     console.log('     · 处理：换文案模板（模4/模5）重发，别再发同样结构');
   }
   process.exit(bad ? 1 : 0);
-})().catch((e) => { console.error('ERR: ' + (e && e.stack || e)); process.exit(2); });
+})().catch((e) => require('../lib/crash').crash(e, 2));

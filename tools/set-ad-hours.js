@@ -154,4 +154,4 @@ return JSON.stringify(all.map(function(c){ var it=c.infoTab||{}; return {
   log('');
   log(bad ? ('❌ 有 ' + bad + ' 个没改成功') : '✅ 全部按目标时段生效');
   fs.writeFileSync(path.join(ROOT, 'set-ad-hours-result.json'), JSON.stringify({ hours: HOURS_ARG, need, results, afterCheck: after.map((a) => ({ id: a.id, span: span(a.hours) })) }, null, 2), 'utf8');
-})().catch((e) => { log('❌ ' + (e && e.stack || e)); process.exit(1); });
+})().catch((e) => require('../lib/crash').crash(e, 1));

@@ -243,4 +243,4 @@ async function auditStore(name) {
   else if (unaudited) console.log('\nⓘ 有 ' + unaudited + ' 家店没读到样本 → 没验成，不等于验过了。把店页拉起来再跑。');
   else console.log('\n✅ 全部对得上');
   process.exit(total ? 1 : (unaudited ? 1 : 0));
-})().catch((e) => { console.log('❌ ' + (e && e.stack || e)); process.exit(2); });
+})().catch((e) => require('../lib/crash').crash(e, 2));
