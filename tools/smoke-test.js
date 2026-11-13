@@ -39,7 +39,9 @@ const EXPECTED = [
   'git 跟踪检查：跳过',
 ];
 
-function main() {
+// 【第 167 轮】改成 async —— 新加的 [6] 起 staff-ui 后要轮询 /api/health，
+//   那里用了 await。main 现在返回 Promise，末尾挂 .catch 兜住未捕获异常。
+async function main() {
   console.log('');
   console.log('  ════ 包内冒烟测试 ════');
 
@@ -209,6 +211,52 @@ function main() {
   //   fs.rmSync 会 EPERM，于是「测试全过但清理崩了」→ 整个冒烟红 → build 报
   //   「四道检查没过」→ 拒发。实测连续两次 build 都栽在这（standalone 跑能过，
   //   因为负载不同、句柄释放得快）。清理是收尾动作，失败只提示。
+  // ── [6] 网页入口：从包里起 staff-ui，验 /api/health 和首页 ──
+  //   为什么加（第 167 轮）：一页纸第 ④ 步是【双击 启动.cmd → 浏览器自动打开】，
+  //   那是学员的【主入口】，而前面五步验的全是命令行。服务起不来 = 学员第一步就卡住。
+  //   用独立端口（默认 8099 可能被本机正在跑的服务占着），跑完立刻杀掉。
+  console.log('\n  [6] 从包里起 staff-ui（网页入口）');
+  const PORT = 18099;
+  let webOk = false;
+  let srv = null;
+  try {
+    srv = require('child_process').spawn(process.execPath,
+      [path.join('tools', 'staff-ui', 'server.js'), '--port=' + PORT, '--store=冒烟测试店'],
+      { cwd: achun, stdio: ['ignore', 'pipe', 'pipe'] });
+    // 等它 listen
+    const deadline = Date.now() + 20000;
+    while (Date.now() < deadline) {
+      try {
+        const http = require('http');
+        await new Promise((res, rej) => {
+          const req = http.get({ host: '127.0.0.1', port: PORT, path: '/api/health', timeout: 2000 },
+            (r) => { let d = ''; r.on('data', (c) => d += c); r.on('end', () => res(d)); });
+          req.on('error', rej); req.on('timeout', () => { req.destroy(); rej(new Error('timeout')); });
+        }).then((d) => { webOk = /"ok"\s*:\s*true/.test(d); });
+        if (webOk) break;
+      } catch (e) { /* 还没起来，继续等 */ }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    console.log('      ' + (webOk ? '✅ /api/health 返回 ok（服务起来了）' : '❌ 20 秒内没起来'));
+    // 首页
+    if (webOk) {
+      const page = await new Promise((res, rej) => {
+        const http = require('http');
+        const req = http.get({ host: '127.0.0.1', port: PORT, path: '/', timeout: 5000 },
+          (r) => { let d = ''; r.on('data', (c) => d += c); r.on('end', () => res(d)); });
+        req.on('error', rej); req.on('timeout', () => { req.destroy(); rej(new Error('timeout')); });
+      }).catch(() => '');
+      const hasCn = /闲鱼|上架|店铺/.test(page);
+      console.log('      ' + (page.length > 1000 && hasCn ? '✅ 首页能开（' + page.length + ' 字节，中文正常）' : '❌ 首页不对'));
+      if (!(page.length > 1000 && hasCn)) webOk = false;
+    }
+  } catch (e) {
+    console.log('      ❌ 起服务失败: ' + e.message);
+  } finally {
+    if (srv) { try { srv.kill(); } catch (e) { /* 已退出 */ } }
+  }
+  if (!webOk) wProblems.push('staff-ui 起不来或首页不对');
+
   if (!KEEP) {
     try { fs.rmSync(tmp, { recursive: true, force: true }); }
     catch (e) { console.log('  · 临时目录没清掉（句柄还占着），不影响结果: ' + e.message); }
@@ -228,4 +276,7 @@ function main() {
   console.log('');
 }
 
-main();
+main().catch((e) => {
+  console.error('❌ 冒烟测试自己炸了: ' + (e && e.stack || e));
+  process.exit(1);
+});

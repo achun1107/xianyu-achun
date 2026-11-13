@@ -48,7 +48,11 @@ try {
  */
 function excluded(rel) {
   const f = rel.replace(/\\/g, '/');
-  if (f === 'stores/_template.json') return false;                 // 例外：建店模板要发  // 【2026-11-13 加】tools/_syntax-check-all.js 是【学员包里的 verify-student-view 要调用的】。
+  if (f === 'stores/_template.json') return false;                 // 例外：建店模板要发
+  // 【第 166 轮加】方案文件模板 —— 配置手册教「照抄现成的改」，
+  //  而 publish-groups/ 整个目录是老板的 140 个真实方案（带 itemId），排掉了。
+  //  没有模板的话，学员照着手册找不到「现成的」可抄。这个 _template 是脱敏版。
+  if (f === 'publish-groups/_template.json') return false;  // 【2026-11-13 加】tools/_syntax-check-all.js 是【学员包里的 verify-student-view 要调用的】。
   //   原来它被下面的「下划线开头 = 一次性脚本」规则排除，结果：
   //     · git 里加了（git add -f）→ 但 make-release 还是不带它
   //     · 包里 verify-student-view 的⑨组 execFileSync 调它 → ENOENT

@@ -120,7 +120,13 @@ const outFile = path.join(outDir, 'base-' + (STYLE === 'custom' ? 'custom' : STY
   } catch (e) {
     // 2026-11-13 改：原来只说「没登录先 museav login」—— 学员根本没有中台账号，
     //   也不知道 museav 是什么。先说清影响（不影响发布），再说怎么修。
-    console.log('❌ 生成专属底图失败：' + ((e && e.message) || e));
+    // 【第 169 轮】同 store-wizard：execFileSync 的 e.message 第一行是「Command failed: <整条命令>」，
+    //   后面混着子进程自己的正常输出。去掉命令行，在剩下的里找最像错误的那行。
+    const _raw = String((e && e.message) || e).split('\n');
+    const _rest = _raw.slice(1).filter((l) => l.trim());
+    const _err = [..._rest].reverse().find((l) => /❌|失败|error|Error|failed|not found|ENOENT/i.test(l));
+    const _brief = (_err || _rest[0] || _raw[0]).trim().replace(/^❌s*/, '').slice(0, 90);
+    console.log('❌ 生成专属底图失败：' + _brief);
     console.log('');
     console.log('   影响：只影响这一张底图。主图会自动改用大麦官方海报，发布照常。');
     console.log('   要修的话：');

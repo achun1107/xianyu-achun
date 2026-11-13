@@ -175,21 +175,45 @@ function createArgs(t, at, first) {
   //   监控就只装了一半 —— 这种「少装了一半还不报错」最难发现。
   //   裸命令名（不含路径分隔符）走 PATH，用 where 确认能解析到就行。
   const missing = [];
-  const resolvable = (c) => {
+  const whereOk = (c) => { try { execFileSync('where', [c], { stdio: 'ignore' }); return true; } catch (e) { return false; } };
+  // 【2026-11-14 第 165 轮修】原来只看 t.cmd，而【解释器型】任务的 cmd 是 node/powershell，
+  //   真正要跑的脚本在 args 里 —— 于是 node 一存在就算"可解析"，
+  //   注册出来的任务指向一个【包里根本没有的文件】，到点静默失败。
+  //   实测：学员包里 ad-balance-duty.ps1 / ad-watch-stuck.ps1 / sheet-command-runner.js
+  //   全都不在（打包规则排掉的），但它们照样会被注册。
+  //   现在：命令本身 + args 里的脚本路径，两样都要存在。
+  const resolvable = (t) => {
+    const c = t.cmd;
     if (!c) return false;
-    if (/[\\/]/.test(c)) return fs.existsSync(c);
-    try { execFileSync('where', [c], { stdio: 'ignore' }); return true; } catch (e) { return false; }
+    const cmdOk = /[\\/]/.test(c) ? fs.existsSync(c) : whereOk(c);
+    if (!cmdOk) return false;
+    const argFiles = String(t.args || '').match(/[A-Za-z]:[\\/][^"'\s]+\.(?:js|ps1|cmd|bat)/g) || [];
+    for (const p of argFiles) {
+      if (!fs.existsSync(p)) return false;
+    }
+    return true;
   };
   TASKS.forEach((t) => {
     if (!t.cmd) { missing.push(t.name + '（没解析到命令路径）'); return; }
-    if (!resolvable(t.cmd)) missing.push(t.name + ' → ' + t.cmd);
+    if (!resolvable(t)) missing.push(t.name + ' → ' + (t.args ? String(t.args).match(/[A-Za-z]:[\\/][^"'\s]+\.(?:js|ps1|cmd|bat)/) || [t.cmd] : [t.cmd])[0]);
   });
   if (missing.length) {
-    console.log('⚠️ 下列任务的命令找不到，跳过它们（先把仓库装全）：');
+    // 【2026-11-14 第 165 轮改】原来这句是「先把仓库装全」—— 但学员包【本来就不带】
+    //   这些文件（开窗/关窗/校验/余额/日报/表格命令是管理员那边的监控，
+    //   打包规则第 109/118 轮排掉的），学员永远"装不全"，看到这句只会以为自己装坏了。
+    //   改成说清：这是设计如此 + 本机实际能装上几个。
+    const total = TASKS.length;
+    const got = total - missing.length;
+    console.log('⚠️ 下列任务的【脚本不在这个包里】，已跳过（这是正常的，不是你装错了）：');
     missing.forEach((m) => console.log('   · ' + m));
     console.log('');
+    console.log('   原因：开窗/关窗/校验/余额巡检/日报/表格命令属于【管理员那边】的监控，');
+    console.log('         发给学员的包里本来就不带（打包时排掉了）。');
+    console.log('         你这边要装的只有能跑的那 ' + got + ' 个 —— 通常就是熔断（ad-cost-breaker）。');
+    console.log('   要看现在装了哪些：node tools/install-tasks.js --check');
+    console.log('');
   }
-  const usable = TASKS.filter((t) => resolvable(t.cmd));
+  const usable = TASKS.filter((t) => resolvable(t));
 
   // ── --remove ──
   if (REMOVE) {

@@ -390,9 +390,31 @@ const check = (name, ok, detail) => {
     {
       // 这两个是【学员自己要建】的（从 .example 复制），本来就不该在包里；
       // 后面几个是产品名 / 被正则截断的残片，不是文件引用。
+      // 【第 166 轮扩】把学员文档里【合理提到但包里没有】的都列进来：
+      //   · 运行时才有 / 系统自带
+      //   · 管理员侧的监控脚本 —— 学员配置手册 4.1 那张表明确标了「❌ 管理员侧」，
+      //     第 165 轮加的说明也讲了「这是正常的，不是你装错了」
+      //   · 内部文档 —— 给学员的一页说明里是【修改记录】（"原来这里列的…换成…"），
+      //     本身就在解释它们不在包里
       const EXPECTED_ABSENT = new Set([
         'service.local.json', 'config.local.json',
         'Node.js', 'node.js', 'local.js',
+        'package.json', 'package-lock.json', 'index.html', 'README.md', 'LICENSE',
+        'xianyu-latest.zip', '版本.txt', 'state.json', 'files.json',
+        'npm.cmd', 'node.exe', 'powershell.exe', 'start.bat', 'install.cmd',
+        'store.json', 'xxx.js', 'xianyu-install-<版本>.zip',
+        'xianyu-templates.json', 'feishu-webhook.txt', 'ad-plan-create-result.json',
+        // 管理员侧监控（学员配置手册 4.1 已标注）
+        'ad-window-guard.cmd', 'ad-plan-alert.js', 'ad-daily-report.js',
+        'ad-balance-duty.ps1', 'ad-watch-stuck.ps1',
+        // 内部文档（一页说明里是修改记录）
+        '闲鱼自动化-操作手册.md', '多店铺快速配置方案.md', '中台需求-xianyu-install-config.md',
+        // 历史事件里提到的工具
+        'workbuddy-run.ps1',
+        // 【第 166 轮】打包工具 —— install-guide 尾部有句「本包由 tools/make-release.js +
+        //   tools/_build-install-bundle.js 产出」（来源说明，不是让学员去跑）；
+        //   selftest-update.js 在配置手册 1.8 的 <details>「开发机用的命令」里（已标注）。
+        'make-release.js', '_build-install-bundle.js', 'selftest-update.js',
       ]);
 
       const inPkg = new Set();
@@ -404,11 +426,17 @@ const check = (name, ok, detail) => {
         }
       })(root);
 
+      // 【第 166 轮扩】原来只查 4 份文档，而学员文档一共 8 份 ——
+      //   第 165 轮手工扫出的 11 处里，有 7 处在这 4 份之外（配置手册/一页说明/速查）。
       const docPaths = [
         path.join(root, 'install-guide.html'),
+        path.join(root, '先看这个-五步上手.html'),
         path.join(achun, '发放说明-给学员.md'),
         path.join(achun, '学员安装-给学员DSH.md'),
-        path.join(achun, '学员五步上手.html'),
+        path.join(achun, '学员配置手册.md'),
+        path.join(achun, '给学员的一页说明.md'),
+        path.join(achun, '学员常见错误速查.md'),
+        path.join(achun, '真机首装验证清单.md'),
       ];
 
       const gone = [];
@@ -416,7 +444,12 @@ const check = (name, ok, detail) => {
       for (const dp of docPaths) {
         if (!fs.existsSync(dp)) continue;
         const t = fs.readFileSync(dp, 'utf8');
-        const refs = [...t.matchAll(/([\w\u4e00-\u9fa5][\w\u4e00-\u9fa5.-]*\.(?:md|cmd|ps1|html))/g)]
+        // 【第 166 轮】原来只匹配 .md/.cmd/.ps1/.html —— 文档里提的 .js/.json 完全不查。
+        //   第 165 轮手工扫学员文档时，`ad-plan-alert.js` 被我在表格里标成「见包内」
+        //   而它其实不在包里，就是这条漏掉的（它是 .js）。
+        // ⚠️ json 必须排在 js 前面 —— 否则 `service.local.json` 会被先匹配成
+        //   `service.local.js`（正则按顺序试），报一堆假的「缺 .js」。第 166 轮踩过。
+        const refs = [...t.matchAll(/([\w\u4e00-\u9fa5][\w\u4e00-\u9fa5.-]*\.(?:md|cmd|ps1|html|json|js))/g)]
           .map((m) => m[1])
           .filter((x) => !EXPECTED_ABSENT.has(x));
         for (const r of new Set(refs)) {

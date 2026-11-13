@@ -260,13 +260,32 @@ function sectionSafety() {
   const S = '⑧ 安全与编码';
   // 密钥文件不能被 git 跟踪
   try {
-    const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
+    // stdio 必须显式给（第 168 轮）：默认情况下 execFileSync【既捕获又转发】子进程 stderr，
+  //   于是学员包里没有 .git 时，`git ls-files` 的
+  //     fatal: not a git repository (or any of the parent directories): .git
+  //   会直接打到屏幕上 —— 而这个检查本来就是【已知会失败、下面用 warn() 兜住】的
+  //   （L269 那句「跳过」），英文原文不该漏给学员看。
+  const tracked = execFileSync('git', ['ls-files', '-z'],
+    { cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
       .split('\0').filter(Boolean);
     const danger = tracked.filter((f) => /(^|\/)(config\.local\.json|service\.local\.json)$/.test(f));
     if (danger.length) bad(S, '密钥文件没被跟踪', '这些被 git 跟踪了：' + danger.join(', '), 'git rm --cached <文件> 并确认 .gitignore');
     else ok(S, '密钥文件没被跟踪', 'config.local.json / service.local.json 都不在版本库里');
     ok(S, '被跟踪文件数', String(tracked.length));
-  } catch (e) { warn(S, 'git 跟踪检查', '跳过：' + String(e.message).slice(0, 60)); }
+  } catch (e) {
+    // 【第 168 轮】原来这里打 e.message —— 而 execFileSync 的 message 里【含着 stderr】，
+    //   于是学员屏上出现两行：
+    //     ⚠️ git 跟踪检查：跳过：Command failed: git ls-files -z
+    //     fatal: not a git repository (or any of the parent directories): .git
+    //   第二行是 git 的英文原文，学员看不懂（他包里本来就不该有 .git）。
+    //   按原因分开说：不是 git 仓库 = 正常；别的原因才带原文。
+    const msg = String(e.stderr || e.message || '');
+    if (/not a git repository/.test(msg)) {
+      warn(S, 'git 跟踪检查', '跳过：这个包不带 .git（正常，只有开发机上才有）');
+    } else {
+      warn(S, 'git 跟踪检查', '跳过：' + String(e.message || e).split('\n')[0].slice(0, 60));
+    }
+  }
 
   for (const f of ['config.local.json', path.join('playwright-service', 'service.local.json')]) {
     const p = path.join(ROOT, f);

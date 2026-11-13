@@ -176,7 +176,17 @@ function sh(script, args, env) {
       baseImg = path.relative(ROOT, outFile).replace(/\\/g, '/');
       console.log('   ✅ 底图：' + baseImg + '  ' + Math.round(fs.statSync(outFile).size / 1024) + 'KB');
     } catch (e) {
-      console.log('   ❌ 出图失败：' + (e.message || e));
+      // 【第 169 轮】e.message 对 execFileSync 是「Command failed: <整条命令>\n<子进程输出>」：
+      //   · 第一行是又长又英文的命令路径 —— 学员看不懂
+      //   · 后面几行里混着子进程自己的正常输出（如 museav 的 prompt）
+      //   所以：去掉命令行 → 在剩下的里找【最像错误的那行】（❌/失败/error/failed），
+      //   找不到就退回第一行。实测出图失败时得到「❌ fetch failed」而不是
+      //   「Command failed: C:\...\node.exe C:\...\museav 提交出图: vertical...」。
+      const _raw = String(e.message || e).split('\n');
+      const _rest = _raw.slice(1).filter((l) => l.trim());
+      const _err = [..._rest].reverse().find((l) => /❌|失败|error|Error|failed|not found|ENOENT/i.test(l));
+      const _brief = (_err || _rest[0] || _raw[0]).trim().replace(/^❌s*/, '').slice(0, 90);
+      console.log('   ❌ 出图失败：' + _brief);
       console.log('      常见原因：没装 museav（npm i -g museav-cli@latest）或没登录（museav login）。');
       console.log('      → 这次不写入底图，发布时会退回用大麦官方海报（不影响发布）。');
       console.log('      → 想补专属底图：museav login 后再跑 node tools/make-base-img.js --store="' + storeName + '" --style=' + styleKey);
