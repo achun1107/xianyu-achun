@@ -578,7 +578,23 @@ const SHOUKAI = LIB['⑨ 刘宪华首开样式（紫块白字+红字三行·居�
     }
   }
   if (useLayers && useLayers.length) {
-    const { chromium } = require(SVC + '/node_modules/playwright');
+    // 【2026-11-13 第 144 轮改】这里原来直接 require，没装依赖时抛的是英文
+    //   「Cannot find module '...\xianyu-playwright-service\node_modules\playwright'」，
+    //   学员看到只会来问「这是什么意思」。改成中文提示 + 明确的下一步。
+    //   （在解压出来的包里跑 publish-one --dry 时必然遇到：包里不带 node_modules。）
+    let chromium;
+    try {
+      ({ chromium } = require(SVC + '/node_modules/playwright'));
+    } catch (e) {
+      console.log('');
+      console.log('❌ 这台机器还没装依赖（找不到 playwright）。');
+      console.log('   出图能出，但「把文字叠到图上」这一步做不了。');
+      console.log('');
+      console.log('   处理：双击包根的 install.cmd（或跑 install.ps1），它会把三个仓的依赖装好。');
+      console.log('   装一次就行，以后不用再管。');
+      console.log('');
+      throw new Error('依赖未安装：' + SVC + '\\node_modules\\playwright 不存在');
+    }
     const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     await page.setContent('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>');
