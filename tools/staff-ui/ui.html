@@ -314,14 +314,14 @@ async function refreshOnboard() {
     if (!d.active) {
       const hasAccounts = (d.stores || []).length > 0;
       if (!d.serviceUp) {
-        el.innerHTML = '<span class="badge bad">8093 服务没在跑</span> —— 双击 <code>xianyu-playwright-service\\start.bat</code> 启动它，再点右上角「预热浏览器」。';
+        el.innerHTML = '<span class="badge bad">浏览器服务没启动</span> —— 双击 <code>xianyu-playwright-service\\start.bat</code> 启动它，然后点右上角「预热浏览器」。';
       } else if (hasAccounts && d.serviceState === 'idle') {
         el.innerHTML = '<span class="badge warn">服务空闲中</span> —— 你的 ' + (d.stores || []).length
           + ' 个店铺都在，只是浏览器上下文被回收了（空闲 20 分钟正常回收）。<b>不用重新扫码</b>，点右上角「预热浏览器」就会回来。';
       } else if (hasAccounts) {
         el.innerHTML = '<span class="badge warn">还没选店铺</span> —— 点右上角「店铺 ▾」，选一个点「登录」扫码。';
       } else {
-        el.innerHTML = '<span class="badge bad">8093 里没有你的账号</span> —— 先填 <code>xianyu-playwright-service\\service.local.json</code> 并重启服务（见发放说明第 3 步）。';
+        el.innerHTML = '<span class="badge bad">浏览器服务里没有你的账号</span> —— 先填 <code>xianyu-playwright-service\\service.local.json</code> 并重启服务（见发放说明第 3 步）。';
       }
       return;
     }
@@ -369,7 +369,7 @@ async function toggleStores() {
   const d = (await refreshStoreLabel()) || {};
   const box = document.getElementById('storeList');
   if (!d.stores || !d.stores.length) {
-    box.innerHTML = '<div style="font-size:13px;color:#f53f3f">读不到店铺列表（8093 服务没起来？）' +
+    box.innerHTML = '<div style="font-size:13px;color:#f53f3f">读不到店铺列表（浏览器服务没起来？）' +
       (d.error ? '<br>' + d.error : '') + '</div>';
   } else {
     box.innerHTML = d.stores.map(s => {
