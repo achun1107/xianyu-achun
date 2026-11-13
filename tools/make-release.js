@@ -116,6 +116,17 @@ function excluded(rel) {
   /^(ad-[\w-]+|wecom-send|ask-dsh|make-channel|ss-call|test-guard-live|add-cmd-sheet|workbuddy-[\w-]+|login-workbuddy|wake-publish-sleep)\.(ps1|cmd|bat)$/,
   /(^|\/)(workbuddy-[\w-]*|login-workbuddy)\.(ps1|cmd)$/,
   /(^|\/)(verify-config|test-utf8-writer)\.ps1$/,
+  // 【2026-11-13 加·第三批】和闲鱼自动化无关的东西。
+  //   第 110 轮按扩展名统计包里 2.35 MB 时发现的：
+  //     dsh-bloom-theme-0.13.2.tgz（141 KB）/ dsh-llm-hub-0.6.1.tgz（47 KB）
+  //         —— 这是【DSH 编辑器自己的主题/插件包】，和闲鱼一点关系没有
+  //     dc4.txt（129 KB）—— 我早期探 goofish 接口时的探测记录（不敏感，但学员用不上）
+  //     dsh-data-backend-prompt.md —— 内部提示词
+  //   这类东西的特征是：在 git 里（所以会被打包），但没人想到要排。
+  /^dsh-.*\.(tgz|md)$/,
+  /^dc4\.txt$/,
+  // 各种「探测/抓包」留下的 .txt / .json（都是开发时的中间产物）
+  /^(probe|dc\d+|netcap|_netcap)[\w.-]*\.(txt|json)$/,
   ];
   return rules.some((r) => r.test(f));
 }

@@ -650,7 +650,9 @@ const check = (name, ok, detail) => {
         const p = path.join(d, name);
         const st = fs.statSync(p);
         if (st.isDirectory()) { rec(p); continue; }
-        if (/\.(cmd|bat|ps1)$/i.test(name)) {
+        // 【2026-11-13 加】顺便查 .tgz（DSH 主题包）和探测记录 —— 它们同样和闲鱼无关，
+        //   第 110 轮实测包里带着 141KB 的 dsh-bloom-theme.tgz 和 129KB 的 dc4.txt。
+        if (/\.(cmd|bat|ps1|tgz)$/i.test(name) || /^dc\d+\.txt$/i.test(name)) {
           const rel = path.relative(root, p).replace(/\\/g, '/');
           found.push({ rel, name });
         }
