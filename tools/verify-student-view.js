@@ -734,6 +734,8 @@ const check = (name, ok, detail) => {
       'update.js', 'utf8-check.js', 'scrub-secrets.js', 'today.js',
       // staff-ui 自己的
       'staff-ui/server.js', 'staff-ui/start.js',
+      // 【2026-11-13 第 140 轮】staff-ui/server.js 会真的执行这三个（预热 / 开关推广 / 应用改动）
+      'ensure-agent.js', 'ad-power.js', 'apply-item.js',
     ]);
     const toolDir = path.join(achun, 'tools');
     const bad = [];

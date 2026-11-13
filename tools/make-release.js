@@ -334,6 +334,12 @@ const TOOLS_ALLOWED = new Set([
   'update.js', 'utf8-check.js', 'scrub-secrets.js', 'today.js',
   // staff-ui 自己
   'staff-ui/server.js', 'staff-ui/start.js',
+  // 【2026-11-13 第 140 轮加】staff-ui/server.js 会【真的执行】这三个，第 137 轮白名单漏了：
+  //   ensure-agent.js —— /api/warmup「预热」按钮
+  //   ad-power.js     —— 开/关推广
+  //   apply-item.js   —— 应用商品改动
+  // 查法：扫所有 js 里 'tools/xxx.js' 这类字符串，看它在不在白名单（见回归第 140 项）。
+  'ensure-agent.js', 'ad-power.js', 'apply-item.js',
 ]);
 
 /**

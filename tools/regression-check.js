@@ -275,7 +275,16 @@ has('tools/_install-guide.html.js', /先看这个-五步上手/, '106  详细版
     const seg = src.slice(i, i + 4000);
     const end = seg.indexOf(']);');
     if (end < 0) return null;
-    return new Set([...seg.slice(0, end).matchAll(/'([\w.\-\/]+\.js)'/g)].map((m) => m[1]));
+    // 逐行抓，跳过注释行 —— 第 140 轮踩过：make-release.js 的注释里写了
+    //   「扫所有 js 里 'tools/xxx.js' 这类字符串」，这句话被一起抓进白名单，
+    //   结果这条检查永远报「make-release 有、verify 没有: tools/xxx.js」。
+    const out = new Set();
+    for (const line of seg.slice(0, end).split(/\r?\n/)) {
+      const s = line.trim();
+      if (s.startsWith('//') || s.startsWith('*') || s.startsWith('/*')) continue;
+      for (const m of line.matchAll(/'([\w.\-\/]+\.js)'/g)) out.add(m[1]);
+    }
+    return out;
   };
   const a = grab(mk, 'const TOOLS_ALLOWED = new Set([');
   const b = grab(vf, 'const ALLOWED_JS = new Set([');
@@ -293,6 +302,35 @@ has('tools/_install-guide.html.js', /先看这个-五步上手/, '106  详细版
       ok('137  两份 tools 白名单一致（' + a.size + ' 个）');
     }
   }
+}
+
+// ── 被代码调用的 tools/*.js 必须在白名单里 ──
+//   第 140 轮：staff-ui/server.js 里 runScript(t, 'tools/ensure-agent.js') 这一句 ——
+//   脚本被第 137 轮的白名单排掉了，学员点「预热」按钮时会报「找不到文件」。
+//   ad-power.js / apply-item.js 同样。这条自动扫 'tools/xxx.js' 这类字符串。
+{
+  const mk = read('tools/make-release.js');
+  const seg = mk.slice(mk.indexOf('const TOOLS_ALLOWED = new Set(['));
+  const end = seg.indexOf(']);');
+  const ALLOWED = new Set([...seg.slice(0, end).matchAll(/'([\w.\-\/]+\.js)'/g)].map((m) => m[1]));
+
+  // 只查【会在包里跑的】文件（维护者工具之间的互相引用不算）
+  const CHECK = ['tools/staff-ui/server.js', 'tools/store-ready.js', 'tools/store-init.js',
+    'tools/store-wizard.js', 'tools/first-publish.js', 'publish-one.js',
+    'ad-cost-breaker.js', 'tools/ad-window.js', 'tools/list-onsale.js'];
+  const missing = [];
+  for (const f of CHECK) {
+    const t = read(f);
+    if (!t) continue;
+    for (const m of t.matchAll(/['"](?:\.\.\/)?tools\/([\w.\-]+\.js)['"]/g)) {
+      const name = m[1];
+      if (!ALLOWED.has(name)) missing.push(name + '（← ' + f + '）');
+    }
+  }
+  const uniq = [...new Set(missing)];
+  uniq.length
+    ? bad('140  被代码调用的 tools/*.js 都在白名单', uniq.slice(0, 4).join(' | '))
+    : ok('140  被代码调用的 tools/*.js 都在白名单');
 }
 
 console.log('');
