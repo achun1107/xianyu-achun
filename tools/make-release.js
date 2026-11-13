@@ -177,6 +177,32 @@ function excluded(rel) {
   //   ⚠️ 检查过：publish-one.js 里提到 publish-schedule.js 只是【注释】，
   //      不是真的读那个 json，排掉不会让发布链报错。
   /^(my-plans|onsale|AD-EXCLUDE|webkubor-baseline|shows-hold|publish-schedule|combined|console-out-[\d]+|poster-templates\.backup_[\w]+|待删除清单-)/,
+  // 【2026-11-13 加·第九批】四个【纯业务数据目录】。
+  //   第 113 轮扫包发现：492 个文本文件里有 982 处真实 itemId、118 处「老板原话」。
+  //   来源就是这四个目录：
+  //     xy-daily/*.json       —— 每日抓取快照（无任何代码引用，纯数据）
+  //     data/ad-daily.json    —— 广告日报，442 处真实 itemId
+  //     publish-groups/*.json —— 发布方案（140 个，引用它的脚本不在包里）
+  //     shows/*.json          —— 场次档案（56 个，含「老板 2026-10-15」这种指令原文）
+  //
+  //   已核实：学员会用的五个脚本（publish-one / first-publish / store-wizard /
+  //   store-init / healthcheck）【一个都不引用这些目录】。排掉不影响学员。
+  /^(xy-daily|publish-groups|shows)\//,
+  /^data\//,
+  // 【2026-11-13 加·第十批】根层剩下的运行产物（跑一次就生成一个，含真实 itemId）。
+  //   第 113 轮扫完还剩 260 处 itemId，主要来自这几个：
+  //     healthcheck.json（43 处）—— 一键体检的缓存结果
+  //     campaigns-now.json（21 处）/ pause-result-*.json（14 处）
+  //     cz-diag.json / cz-probe.json（各 12 处）—— 排查时 dump 的
+  //   这些都是"跑完就有、下次跑会重新生成"的东西，学员机器上第一次跑自己会写。
+  /^(healthcheck|campaigns-now|cz-diag|cz-probe|pause-result-[\d]+|ad-pending|dig-\w+)[\w.-]*\.json$/,
+  // 【2026-11-13 加·第十一批】老板的广告【脚本】（.js）。
+  //   前面排 ad-*.ps1 / ad-*.cmd / ad-*.json，漏了 .js ——
+  //   第 113 轮 scan-package 扫出来 ad-stop-two.js（8 处真实 itemId）、
+  //   ad-stop-shows.js（7 处）还在包里。这些是"停某几个计划"的专用脚本，
+  //   里面写死了老板的 itemId，学员双击/运行只会报错。
+  /^ad-[\w-]+\.js$/,
+  /^(pause|resume|stop|start)-[\w-]+\.js$/,
   ];
   return rules.some((r) => r.test(f));
 }
