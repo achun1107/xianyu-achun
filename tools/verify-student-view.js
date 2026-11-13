@@ -269,21 +269,51 @@ const check = (name, ok, detail) => {
     check('guide 里的 --参数脚本都认', flagProblems.length === 0,
       flagProblems.length ? flagProblems.slice(0, 3).join(' | ') : cmds.length + ' 条命令');
 
-    // ⑤ guide 里点名引用的文件，包里必须真的有
+    // ⑤ 学员文档里点名的文件，包里必须真的有
     //   为什么加（2026-11-13）：install-guide.html 里写着「包里 xianyu-achun\\学员常见错误速查.md」，
     //   但那个文件【从未被 git 跟踪】—— make-release 从 git ls-files 打包，自然就没有它。
     //   学员按提示去找，找不到。这类问题 ①~④ 都抓不到：它们验的是"包里有的东西对不对"，
     //   不验"该有的东西有没有"。
-    //
-    //   只查【带 xianyu-achun\\ 前缀】的 .md 引用 —— 不带前缀的一律不查，
-    //   因为 guide 里还有 `Node.js`（产品名）、`local.js`（被正则截断的 config.local.json）这类误报。
     {
-      const refRe = /xianyu-achun\\([\w\u4e00-\u9fa5.-]+\.md)/g;
-      const wanted = [...html.matchAll(refRe)].map((m) => m[1]);
-      const uniq = [...new Set(wanted)];
-      const gone = uniq.filter((f) => !fs.existsSync(path.join(achun, f)));
-      check('guide 引用的 .md 文件都在包里', gone.length === 0,
-        gone.length ? '缺: ' + gone.join(', ') : uniq.length + ' 个引用');
+      // 这两个是【学员自己要建】的（从 .example 复制），本来就不该在包里；
+      // 后面几个是产品名 / 被正则截断的残片，不是文件引用。
+      const EXPECTED_ABSENT = new Set([
+        'service.local.json', 'config.local.json',
+        'Node.js', 'node.js', 'local.js',
+      ]);
+
+      const inPkg = new Set();
+      (function rec(d) {
+        for (const name of fs.readdirSync(d)) {
+          const p = path.join(d, name);
+          const st = fs.statSync(p);
+          if (st.isDirectory()) rec(p); else inPkg.add(name);
+        }
+      })(root);
+
+      const docPaths = [
+        path.join(root, 'install-guide.html'),
+        path.join(achun, '发放说明-给学员.md'),
+        path.join(achun, '学员安装-给学员DSH.md'),
+        path.join(achun, '学员五步上手.html'),
+      ];
+
+      const gone = [];
+      let refCount = 0;
+      for (const dp of docPaths) {
+        if (!fs.existsSync(dp)) continue;
+        const t = fs.readFileSync(dp, 'utf8');
+        const refs = [...t.matchAll(/([\w\u4e00-\u9fa5][\w\u4e00-\u9fa5.-]*\.(?:md|cmd|ps1|html))/g)]
+          .map((m) => m[1])
+          .filter((x) => !EXPECTED_ABSENT.has(x));
+        for (const r of new Set(refs)) {
+          refCount++;
+          if (!inPkg.has(r)) gone.push(path.basename(dp) + ' → ' + r);
+        }
+      }
+      const uniqGone = [...new Set(gone)];
+      check('学员文档引用的文件都在包里', uniqGone.length === 0,
+        uniqGone.length ? uniqGone.slice(0, 3).join(' | ') : refCount + ' 个引用');
     }
   }
 
