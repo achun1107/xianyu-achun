@@ -379,30 +379,43 @@ const check = (name, ok, detail) => {
     // 【2026-11-13 优化】原来这里对每个文件启动一次 `node -c`，293 个文件 = 293 次进程启动，
     //   占掉全部检查时间的一半以上（总耗时 127 秒）。
     //   改用 _syntax-check-all.js 在单进程里用 vm.Script 解析所有文件：1.3 秒，快 80 倍。
-    let ok = false;
-    let detail = '';
-    try {
-      execFileSync('node', [path.join(__dirname, '_syntax-check-all.js'), '--json', achun],
-        { encoding: 'utf8', timeout: 120000, stdio: 'pipe' });
-      ok = true;
-      detail = '全部通过';
-    } catch (e) {
-      const raw = String(e.stdout || '');
+    //
+    // ⚠️【2026-11-13 修】脚本路径原来用的是 __dirname（= 开发机那份），
+    //   于是【包里的那份丢了也测不出来】—— 第 88 轮就是这么漏的：
+    //   gitignore + make-release 两道规则把 _syntax-check-all.js 挡在外面，
+    //   开发机上一切正常，包里却缺文件。
+    //   现在改成用【包里那份】，并且先检查它在不在。
+    const checkerInPkg = path.join(achun, 'tools', '_syntax-check-all.js');
+    const checkerExists = fs.existsSync(checkerInPkg);
+    check('包内有 _syntax-check-all.js（自检自己要用的）', checkerExists,
+      checkerExists ? '' : '包里缺这个脚本，下面那项测不了');
+
+    if (checkerExists) {
+      let ok = false;
+      let detail = '';
       try {
-        const j = JSON.parse(raw);
-        if (j && Array.isArray(j.bad) && j.bad.length) {
-          detail = j.bad.slice(0, 2)
-            .map((b) => path.basename(b.file) + ': ' + b.err)
-            .join(' | ');
-        } else {
-          detail = '（解析不出错误详情）';
+        execFileSync('node', [checkerInPkg, '--json', achun],
+          { encoding: 'utf8', timeout: 120000, stdio: 'pipe' });
+        ok = true;
+        detail = '全部通过';
+      } catch (e) {
+        const raw = String(e.stdout || '');
+        try {
+          const j = JSON.parse(raw);
+          if (j && Array.isArray(j.bad) && j.bad.length) {
+            detail = j.bad.slice(0, 2)
+              .map((b) => path.basename(b.file) + ': ' + b.err)
+              .join(' | ');
+          } else {
+            detail = '（解析不出错误详情）';
+          }
+        } catch (e2) {
+          detail = raw.split('\n').slice(0, 2).join(' ').slice(0, 120) || '执行失败';
         }
-      } catch (e2) {
-        detail = raw.split('\n').slice(0, 2).join(' ').slice(0, 120) || '执行失败';
+        ok = false;
       }
-      ok = false;
+      check('achun 的 js 全部语法正确', ok, ok ? '' : detail);
     }
-    check('achun 的 js 全部语法正确', ok, ok ? '' : detail);
   }
 
   // ── ⑩ 所有 HTML 里的内联 <script> ──
