@@ -79,6 +79,35 @@ function info(msg) { console.log('      ·  ' + msg); }
   }
   ok(ZIP + '  ' + (fs.statSync(ZIP_PATH).size / 1024 / 1024).toFixed(2) + ' MB');
 
+  // 【2026-11-14 第 161 轮加】发之前先看打包时那四道检查的结果。
+  //   为什么：_build-install-bundle 的 try/catch 会吞掉非零退出码（设计是"只报告不阻断"），
+  //   于是出现过「冒烟测试红了、包照发」—— 瞬时抖动红一次我没注意就发了。
+  //   现在打包会把结果写进 <zip>.checks.json，这里读它，任一失败就【拒绝发】。
+  const checksFile = ZIP_PATH + '.checks.json';
+  if (!fs.existsSync(checksFile)) {
+    console.log('');
+    console.log('  ❌ 找不到 ' + path.basename(checksFile));
+    console.log('     这个文件是 _build-install-bundle.js 写的（四道检查的结果）。');
+    console.log('     没有它 = 这个包不是从当前流程打出来的，或者打包时没跑检查。');
+    console.log('     重新跑一次：node tools\\_build-install-bundle.js');
+    console.log('');
+    process.exit(1);
+  }
+  let checks;
+  try { checks = JSON.parse(fs.readFileSync(checksFile, 'utf8')); } catch (e) {
+    console.log('  ❌ ' + path.basename(checksFile) + ' 解析不了：' + e.message);
+    process.exit(1);
+  }
+  if (!checks.ok) {
+    const failed = (checks.checks || []).filter((c) => !c.ok).map((c) => c.name);
+    console.log('');
+    console.log('  ❌ 这个包的四道检查没过，拒绝发布：' + failed.join('、'));
+    console.log('     打包时间 ' + checks.at + '，重跑 _build-install-bundle.js 让检查过了再来。');
+    console.log('');
+    process.exit(1);
+  }
+  ok('四道检查全过（' + (checks.checks || []).length + ' 道，' + checks.at.slice(11, 19) + '）');
+
   // ── ② clone gh-pages ──
   step(2, 'clone gh-pages');
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'publishpkg-'));
