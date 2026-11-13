@@ -198,7 +198,10 @@ Head '中台配置下发'
 $tmpResp = Join-Path $env:TEMP ('xy-install-' + (Get-Date -Format 'yyyyMMdd_HHmmss') + '.json')
 $gotRemote = $false
 if (-not $InstallCode) {
-    Warn '没有给 -InstallCode，跳过中台下发（密钥/账号要事后手工补）'
+    # 2026-11-13：学员根本不知道 InstallCode 是什么，原来那句等于没说
+    Info '没给安装码（-InstallCode）—— 正常，不用管'
+    Write-Host '         安装码是「自动拉取你的账号和密钥」用的，那个功能还没做好。'
+    Write-Host '         现在走的是「手工填配置」，所以这一步跳过不影响使用。'
 } elseif ($DryRun) {
     Info ('[DryRun] GET ' + $MiddleBase.TrimEnd('/') + '/api/xianyu-install-config  (X-Install-Code: ' + (Mask $InstallCode) + ')')
 } else {
@@ -252,6 +255,9 @@ if (-not (Test-Path $svcCfg)) {
     if ($sc.apiKey -eq $ac.service.apiKey) { Ok ('两边一致：' + (Mask $sc.apiKey)) }
     else {
         Warn ('两边 apiKey 不一致！服务=' + (Mask $sc.apiKey) + '  客户端=' + (Mask $ac.service.apiKey))
+        # 2026-11-13：只报「不一致」学员不知道会怎样。说清后果和下一步。
+        Write-Host '         会导致：本机出的图和 8093 服务互相不认，请求全部 401。'
+        Write-Host '         下面会自动把服务侧密钥同步过来 —— 看到「已同步」就不用管。'
         if ($DryRun) { Info '[DryRun] 会把服务侧的密钥同步进 config.local.json' }
         else {
             if (-not $ac.service) { $ac | Add-Member -NotePropertyName service -NotePropertyValue ([pscustomobject]@{}) }
@@ -260,7 +266,12 @@ if (-not (Test-Path $svcCfg)) {
             Ok '已把服务侧密钥同步进 config.local.json'
         }
     }
-} else { Warn '读不到其中一边的 apiKey，跳过对齐' }
+} else {
+    # 2026-11-13：原来只说"读不到 apiKey"，学员不知道这意味着什么
+    Warn '两边配置里的 apiKey 对不上（或有一边还没写），这一项跳过'
+    Write-Host '         影响：出图照常，但「共享版式到中台」可能会失败。'
+    Write-Host '         处理：一般不用管；真遇到共享版式失败再找管理员对齐。'
+}
 
 # ── 6. 服务依赖 ─────────────────────────────────────────────────
 Head '服务依赖'
