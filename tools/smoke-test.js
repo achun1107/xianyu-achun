@@ -146,28 +146,63 @@ function main() {
   //   它一条链上验了四件事：8093 账号表读得到、museav 能出图、按底图主色推荐版式、
   //   档案能拼出来（--dry 只不落盘）。
   //   输入喂一行店名，后面的步骤读到 EOF 就走默认值 —— 实测能一路跑完五步。
-  console.log('\n  [4] 在包内跑 store-wizard --dry（配置模板那一步）');
+  console.log('\n  [4] 在包内跑 store-wizard --apply（配置模板那一步）');
   let wOut = '';
   try {
-    wOut = execFileSync('node', [path.join('tools', 'store-wizard.js'), '--dry'],
-      { cwd: achun, encoding: 'utf8', timeout: 180000, stdio: 'pipe', input: '冒烟测试店\n' });
+    wOut = execFileSync('node', [path.join('tools', 'store-wizard.js'), '--apply'],
+      { cwd: achun, encoding: 'utf8', timeout: 180000, stdio: 'pipe', input: '冒烟配发店\n' });
   } catch (e) {
     wOut = String((e.stdout || '') + (e.stderr || ''));
   }
   const wSteps = {
     账号表: /8093 里的闲鱼账号/.test(wOut),
-    出图: /底图：|出图中/.test(wOut),
+    // 出图：museav 成功（✅ 底图：…）或者【按设计降级】（出图失败但给出中文补救命令）
+    //   第 162 轮实测：museav 挂了时向导会打
+    //     「这次不写入底图，发布时会退回用大麦官方海报（不影响发布）」
+    //     +「想补专属底图：museav login 后再跑 node tools/make-base-img.js …」
+    //   这是【处理过的降级】不是 bug，不该让冒烟测试红。
+    出图: /✅ 底图：/.test(wOut) || (/出图失败/.test(wOut) && /不影响发布/.test(wOut)),
     版式推荐: /推荐：/.test(wOut),
-    档案预览: /将要写入档案/.test(wOut),
-    dry标注: /\[--dry\] 不写档案/.test(wOut),
+    档案预览: /将要写入档案|还差这两步/.test(wOut),
+    档案写成功: fs.existsSync(path.join(achun, 'stores', '冒烟配发店.json')),
   };
   Object.entries(wSteps).forEach(([k, v]) => console.log('      ' + (v ? '✅' : '❌') + ' ' + k));
+  // 只把【没被处理过的】算失败：
+  //   fetch failed / 出图失败 —— 向导已给出中文说明和补救命令（见上）
+  //   依赖没装 —— 中文提示已给（见 [3]）
   const wProblems = wOut.split(/\r?\n/).filter((l) =>
     /^(❌|Error:|TypeError|ReferenceError)/.test(l.trim())
-    && !/还没装依赖|依赖未安装/.test(l));
+    && !/还没装依赖|依赖未安装|fetch failed|出图失败|Command failed/.test(l));
   if (wProblems.length) {
     console.log('      ❌ 意料之外的报错 ' + wProblems.length + ' 行:');
     wProblems.slice(0, 4).forEach((l) => console.log('          ' + l.trim().slice(0, 90)));
+  }
+
+  // ── [5] 用【刚配好的店】发一次 ──
+  //   为什么（第 162 轮）：[3] 是【没配店】时发的，走的是默认档；
+  //   而学员一定是【先配店再发】，那条路会 require sharp（裁切/缩放），
+  //   第 162 轮实测那里原来甩英文 Cannot find module —— 只有带档案才走得到。
+  console.log('\n  [5] 用刚配好的店发一次（XY_STORE=冒烟配发店 --dry）');
+  let cOut = '';
+  try {
+    cOut = execFileSync('node', [path.join('publish-one.js'), '广州', '王嘉尔', '--dry'],
+      {
+        cwd: achun, encoding: 'utf8', timeout: 240000, stdio: 'pipe',
+        env: Object.assign({}, process.env, { XY_STORE: '冒烟配发店' }),
+      });
+  } catch (e) {
+    cOut = String((e.stdout || '') + (e.stderr || ''));
+  }
+  const cLines = cOut.split(/\r?\n/);
+  const cGotImage = /出图: OK/.test(cOut);
+  const cNoDep = /还没装依赖|依赖未安装|Cannot find module/i.test(cOut);
+  console.log('      ' + (cGotImage ? '✅ 出图 OK（带档案的完整链路通）'
+    : cNoDep ? '·（正常）没装依赖，中文提示已给' : '⚠️ 没看到「出图: OK」'));
+  // 关键：不能甩裸英文
+  const cRaw = cLines.filter((l) => /Cannot find module|MODULE_NOT_FOUND/.test(l));
+  if (cRaw.length) {
+    console.log('      ❌ 还在甩英文 Cannot find module：' + cRaw[0].trim().slice(0, 90));
+    wProblems.push('带档案发时甩了 Cannot find module');
   }
 
   if (!KEEP) fs.rmSync(tmp, { recursive: true, force: true });

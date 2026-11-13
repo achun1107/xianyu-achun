@@ -22,6 +22,32 @@ const KEY = SVC_ENV.apiKey;
 const OUTDIR = path.join(ROOT, 'publish-out');
 
 /**
+ * 从 xianyu-playwright-service 的 node_modules 里 require 一个包。
+ *
+ * 【2026-11-14 第 162 轮】包里【不带 node_modules】（100 MB，学员自己 npm install），
+ *   所以解压完直接跑 publish-one 必然走到这里。原来 5 处 require 是裸的，
+ *   抛出来的是英文：
+ *       ❌ Cannot find module 'C:/.../xianyu-playwright-service/node_modules/sharp'
+ *   第 144 轮只包了 playwright 那一处，第 162 轮实测【带档案发】时 sharp 的四处
+ *   （L413/441/488/612）照样甩英文 —— 一次修完，别再一处一处补。
+ *
+ * @param {string} name  包名（'sharp' / 'playwright'）
+ * @param {string} [hint] 这个包是干嘛的，装好之前哪一步做不了
+ */
+function requireSvc(name, hint) {
+  try { return require(SVC + '/node_modules/' + name); }
+  catch (e) {
+    console.log('');
+    console.log('❌ 这台机器还没装依赖（找不到 ' + name + '）。');
+    if (hint) console.log('   装好之前：' + hint);
+    console.log('   处理：双击包根的 install.cmd（或跑 install.ps1），它会把三个仓的依赖装好。');
+    console.log('   装一次就行，以后不用再管。');
+    console.log('');
+    throw new Error('依赖未安装：' + SVC + '\\node_modules\\' + name + ' 不存在');
+  }
+}
+
+/**
  * 【2026-10-07 加】店铺档案 —— 一店一文件 stores/<店铺名>.json。
  *
  * 为什么：这个脚本原来把 10 个维度里的 9 个写死在代码里（分类/规格/库存/发货/承诺/所在地…
@@ -410,7 +436,7 @@ const SHOUKAI = LIB['⑨ 刘宪华首开样式（紫块白字+红字三行·居�
   const baseViaServer = !!(BASE_IMG && tpl.kind === 'json' && tpl.noDefaultBlocks === false);
   if (MAIN_IMG) {
     if (!fs.existsSync(MAIN_IMG)) { console.log('❌ 指定的主图不存在: ' + MAIN_IMG); process.exit(1); }
-    const sharp0 = require(SVC + '/node_modules/sharp');
+    const sharp0 = requireSvc('sharp', '底图/主图的裁切、缩放做不了');
     const raw0 = fs.readFileSync(MAIN_IMG);
     const meta0 = await sharp0(raw0).metadata();
     const w0 = meta0.width, h0 = meta0.height;
@@ -438,7 +464,7 @@ const SHOUKAI = LIB['⑨ 刘宪华首开样式（紫块白字+红字三行·居�
     //   本来就在服务端（xuliang-v1）时，「漏出黄块紫块」正是我们要的东西 —— 见 baseViaServer。
     const f0 = BASE_IMG;
     if (!fs.existsSync(f0)) { console.log('❌ 指定的底图不存在: ' + f0); process.exit(1); }
-    const sharp0 = require(SVC + '/node_modules/sharp');
+    const sharp0 = requireSvc('sharp', '底图/主图的裁切、缩放做不了');
     const raw0 = fs.readFileSync(f0);
     const meta0 = await sharp0(raw0).metadata();
     const w0 = meta0.width, h0 = meta0.height;
@@ -485,7 +511,7 @@ const SHOUKAI = LIB['⑨ 刘宪华首开样式（紫块白字+红字三行·居�
   //   「2026守望先锋全球总决赛」整块盖住，等于把底条版白做了。
   //   语义上 KUN_MAIN_IMG 就是「整张海报直接用、什么都不叠」，贴纸同理。
   if (!MAIN_IMG && tpl.stickers && tpl.stickers.length) {
-    const sharp1 = require(SVC + '/node_modules/sharp');
+    const sharp1 = requireSvc('sharp', '底图/主图的裁切、缩放做不了');
     const buf = Buffer.from(imgB64, 'base64');
     const meta1 = await sharp1(buf).metadata();
     const inputs = [];
@@ -578,23 +604,10 @@ const SHOUKAI = LIB['⑨ 刘宪华首开样式（紫块白字+红字三行·居�
     }
   }
   if (useLayers && useLayers.length) {
-    // 【2026-11-13 第 144 轮改】这里原来直接 require，没装依赖时抛的是英文
-    //   「Cannot find module '...\xianyu-playwright-service\node_modules\playwright'」，
-    //   学员看到只会来问「这是什么意思」。改成中文提示 + 明确的下一步。
-    //   （在解压出来的包里跑 publish-one --dry 时必然遇到：包里不带 node_modules。）
-    let chromium;
-    try {
-      ({ chromium } = require(SVC + '/node_modules/playwright'));
-    } catch (e) {
-      console.log('');
-      console.log('❌ 这台机器还没装依赖（找不到 playwright）。');
-      console.log('   出图能出，但「把文字叠到图上」这一步做不了。');
-      console.log('');
-      console.log('   处理：双击包根的 install.cmd（或跑 install.ps1），它会把三个仓的依赖装好。');
-      console.log('   装一次就行，以后不用再管。');
-      console.log('');
-      throw new Error('依赖未安装：' + SVC + '\\node_modules\\playwright 不存在');
-    }
+    // 【2026-11-13 第 144 轮改；第 162 轮统一到 requireSvc】
+    //   这里原来直接 require，没装依赖时抛英文 Cannot find module。
+    //   第 162 轮发现 sharp 的四处也一样裸着，于是一并收进 requireSvc()。
+    const chromium = requireSvc('playwright', '出图能出，但「把文字叠到图上」这一步做不了');
     const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     await page.setContent('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>');
@@ -609,7 +622,7 @@ const SHOUKAI = LIB['⑨ 刘宪华首开样式（紫块白字+红字三行·居�
   }
 
   // 统一转 JPEG（图床接口按 image/jpeg 上传），顺便压小体积
-  const sharp = require(SVC + '/node_modules/sharp');
+  const sharp = requireSvc('sharp', '底图/主图的裁切、缩放做不了');
   const jpg = await sharp(Buffer.from(imgB64, 'base64')).jpeg({ quality: 92 }).toBuffer();
   const imgFile = path.join(OUTDIR, [CITY, STAR, tpl.key.replace(/[^a-z0-9_-]/gi, ''), Date.now()].join('-') + '.jpg');
   fs.writeFileSync(imgFile, jpg);
