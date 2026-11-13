@@ -98,16 +98,58 @@ function main() {
   const sum = out.match(/✅ (\d+) 项通过\s+⚠️ (\d+) 项待办\s+❌ (\d+) 项有问题/);
   if (sum) console.log('\n      汇总: ' + sum[1] + ' ✅ / ' + sum[2] + ' ⚠️ / ' + sum[3] + ' ❌');
 
+  // ── [3] 跑【学员最可能手贱试的那条】：publish-one 城市 明星 --dry ──
+  //   第 144 轮实测：它在「还没装依赖」时抛的是英文
+  //   「Cannot find module '...\node_modules\playwright'」—— 和 healthcheck 的失败
+  //   完全不是一回事，只有真跑一次才看得见。
+  //   --dry 不发（只出图），产物落在临时目录里，跑完整个 tmp 一起删掉。
+  console.log('\n  [3] 在包内跑 publish-one 广州 王嘉尔 --dry');
+  let pOut = '';
+  try {
+    pOut = execFileSync('node', [path.join('publish-one.js'), '广州', '王嘉尔', '--dry'],
+      { cwd: achun, encoding: 'utf8', timeout: 240000, stdio: 'pipe' });
+  } catch (e) {
+    pOut = String((e.stdout || '') + (e.stderr || ''));
+  }
+  const pLines = pOut.split(/\r?\n/);
+
+  // 这些是【正常的】（学员装之前）：
+  const P_EXPECTED = [
+    /还没装依赖/,                    // 144 轮改的中文提示（上面那三行）
+    /依赖未安装/,                    // 144 轮 throw 的那一行（也是正常的）
+    /Cannot find module .*playwright/i,  // 万一中文提示没生效，也别算致命
+    /还没有自己的档案/,               // 店没配
+    /先用一套通用默认值跑/,
+    /出图: OK/,                      // 说明主链路通
+  ];
+  const pProblems = pLines.filter((l) => {
+    if (/^(❌|Error:|TypeError|ReferenceError)/.test(l.trim())) {
+      return !P_EXPECTED.some((re) => re.test(l));
+    }
+    return false;
+  });
+
+  // 关键正面信号：能出图 = 8093 通 + 大麦取数通 + 模板引擎通
+  const gotImage = /出图: OK/.test(pOut);
+  console.log('      ' + (gotImage ? '✅ 出图 OK（8093 + 大麦取数 + 模板引擎都通）' : '⚠️ 没看到「出图: OK」'));
+  const noDep = /还没装依赖|Cannot find module .*playwright/i.test(pOut);
+  if (noDep) console.log('      ·（正常）这台机器没装依赖，叠字那步做不了（中文提示已给）');
+
+  if (pProblems.length) {
+    console.log('      ❌ 意料之外的报错 ' + pProblems.length + ' 行:');
+    pProblems.slice(0, 4).forEach((l) => console.log('          ' + l.trim().slice(0, 90)));
+  }
+
   if (!KEEP) fs.rmSync(tmp, { recursive: true, force: true });
   else console.log('\n      临时目录保留: ' + tmp);
 
   console.log('');
-  if (unexpected.length) {
-    console.log('  ❌ 有 ' + unexpected.length + ' 项意料之外的失败 —— 这个包发出去学员会卡住');
+  if (unexpected.length || pProblems.length) {
+    console.log('  ❌ 有 ' + (unexpected.length + pProblems.length) + ' 项意料之外的失败 —— 这个包发出去学员会卡住');
     console.log('');
     process.exit(1);
   }
-  console.log('  ✅ 没有意料之外的失败（「没装过」那两条是正常的）');
+  console.log('  ✅ 没有意料之外的失败（「没装过」那几条是正常的）');
   console.log('');
 }
 
