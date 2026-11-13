@@ -126,6 +126,50 @@ const logmod = require('../lib/log');
   assert(allProfilesOk,
     '现有 ' + storeNames.length + ' 个店的档案都能解析' + (badProfile ? '（坏的是 ' + badProfile + '）' : ''));
 
+  // 价格 / 库存：非法值必须抛错（2026-11-13 加）。
+  //   原来这两个字段完全不校验，档案里写 -100 或 "abc" 会一路传到 mtop 的 payload，
+  //   等到平台拒绝才知道，而且报错信息看不出是档案写错了。
+  {
+    const fsx = require('fs');
+    const px = require('path');
+    const TMPNAME = '__断言用临时档案__';
+    const tmpFile = px.join(sp.DIR, TMPNAME + '.json');
+    const mk = (extra) => Object.assign({
+      $schema: 'store-profile/1', name: TMPNAME, accountId: '', enabled: true, status: 'live',
+    }, extra);
+    const mustThrow = (label, extra) => {
+      let threw = false;
+      try {
+        fsx.writeFileSync(tmpFile, JSON.stringify(mk(extra), null, 2), 'utf8');
+        sp.load(TMPNAME);
+      } catch (e) {
+        threw = /不是合法的非负数字/.test(String(e.message));
+      }
+      return { label, threw };
+    };
+    const mustPass = (label, extra) => {
+      let ok = true;
+      try {
+        fsx.writeFileSync(tmpFile, JSON.stringify(mk(extra), null, 2), 'utf8');
+        sp.load(TMPNAME);
+      } catch (e) {
+        ok = false;
+      }
+      return { label, threw: ok };   // 这里 threw 复用"是否符合预期"
+    };
+
+    const r1 = mustThrow('价格负数', { 价格: -100 });
+    const r2 = mustThrow('价格非数字', { 价格: 'abc' });
+    const r3 = mustThrow('库存负数', { 库存: -5 });
+    const r4 = mustPass('价格 0 合法', { 价格: 0 });
+    const r5 = mustPass('价格 50 合法', { 价格: 50 });
+
+    try { fsx.unlinkSync(tmpFile); } catch (e) {}
+
+    assert(r1.threw && r2.threw && r3.threw, '价格/库存非法值会抛错');
+    assert(r4.threw && r5.threw, '价格合法值（含 0）不误报');
+  }
+
   // ── 服务 ──
   const up = await http.alive();
   out.kv('服务存活', up ? '是' : '否');
