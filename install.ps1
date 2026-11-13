@@ -381,9 +381,19 @@ else {
         if (Test-Path $mk) {
             & $NodeExe $mk --store=$studentStore 2>&1 | ForEach-Object { Write-Host ('         ' + $_) }
             if (Test-Path $tplUser) { Ok ('已生成: ' + $tplUser) }
-            else { Warn '生成失败，发布时会缺文案模板' }
+            else {
+                # 2026-11-13 改：原来写「发布时会缺文案模板」—— 听起来像发不出去，学员会慌。
+                #   实际有兜底：storeTemplates 里没有这个店时用【全部模板】照样能发。
+                Warn '文案模板库没生成成功 —— 不影响发布（会自动用全部模板）'
+                Write-Host '         只是「按店铺挑模板」这个功能用不了，所有店共用同一套。'
+                Write-Host '         想修：把这条发给管理员，或者重跑一次 install.cmd。'
+            }
         }
-        else { Warn '缺 tools\make-templates-from-example.js（把这条发给管理员）' }
+        else {
+            # 同上：缺这个脚本也不影响发布，只是挑模板功能用不了
+            Warn '缺 tools\make-templates-from-example.js —— 不影响发布'
+            Write-Host '         处理：把这条发给管理员，让他补上这个文件。'
+        }
     }
 }
 
