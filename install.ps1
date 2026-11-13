@@ -147,7 +147,14 @@ $GitExe = $null
 if (-not $SkipDeps) {
     $g = Get-Command git -ErrorAction SilentlyContinue
     if ($g) { $GitExe = $g.Source; Ok ('git: ' + $GitExe) }
-    else { Warn '找不到 git —— 依赖仓库只能靠手动解压（见下面「下一步」）' }
+    else {
+        # 2026-11-13：学员不知道 git 是干嘛的，也不知道没它会影响什么
+        Warn '这台电脑没有 git（版本管理工具）'
+        Write-Host '         影响：本来要自动下载两个配套目录（xianyu-playwright-service / xianyu-monitor），'
+        Write-Host '               现在下不了 —— 安装包要提前把这两个目录解压好，否则装完用不了。'
+        Write-Host '         处理：如果你拿的是完整 zip（解压出来就有三个目录），忽略这条即可。'
+        Write-Host '               如果只有 xianyu-achun 一个目录，去找管理员要完整包。'
+    }
 }
 
 # ── 2. 依赖仓库（这里只定义函数，调用在第 4b 步）──────────────────
@@ -162,7 +169,12 @@ function Ensure-Repo([string]$Dir, [string]$RepoName, [string]$Marker, [string]$
     if (Test-Path (Join-Path $Dir '.git')) { Ok ($RepoName + ' 已克隆: ' + $Dir); return $true }
     if (Test-Path $Dir) {
         $n = @(Get-ChildItem $Dir -Force -ErrorAction SilentlyContinue).Count
-        if ($n -gt 0) { Warn ($RepoName + ' 目录非空但缺 ' + $Marker + ': ' + $Dir + '（' + $n + ' 项）'); return $false }
+        if ($n -gt 0) {
+            Warn ($RepoName + ' 这个目录里已经有东西，但不像正常的仓库：' + $Dir)
+            Write-Host ('         缺了关键文件（' + $Marker + '），可能是解压不完整或者放错了地方。')
+            Write-Host '         处理：把这个目录删掉，重新从 zip 里解压一份出来。'
+            return $false
+        }
     }
     if ($SkipDeps) { Miss ($RepoName + ' 不存在（-SkipDeps）：' + $Dir + '  —— ' + $Why); return $false }
     if (-not $GitExe) { Miss ($RepoName + ' 需要手动放置到 ' + $Dir + '（没有 git，无法克隆）'); return $false }
@@ -185,7 +197,11 @@ function Ensure-Repo([string]$Dir, [string]$RepoName, [string]$Marker, [string]$
 Head '本机配置'
 $cfgTool = Join-Path $Root 'tools\install-config.js'
 if (-not (Test-Path $cfgTool)) {
-    Bad ('找不到 ' + $cfgTool + ' —— 仓库不完整，install-config.js 必须存在')
+    # 2026-11-13：学员不知道 install-config.js 是什么
+    Bad '这个安装包不完整 —— 缺了核心文件 tools\install-config.js'
+    Write-Host '     说明：那个文件负责「告诉程序你的电脑路径在哪」，没有它装不下去。'
+    Write-Host '     处理：重新下载 zip 并完整解压（别只拷一部分文件），再跑一次。'
+    exit 1
     exit 1
 }
 $argv = @($cfgTool, '--derive', '--apply')
