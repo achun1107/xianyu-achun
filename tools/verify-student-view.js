@@ -290,7 +290,40 @@ const check = (name, ok, detail) => {
       synBad.length ? synBad.slice(0, 2).join(' | ') : jsFiles.length + ' 个文件');
   }
 
-  // ── ⑨ 汇总 ──
+  // ── ⑨ xianyu-achun 自己的 Node 代码语法 ──
+  //   为什么加（2026-11-13）：前面几十轮一直在验"装得上吗、文档对不对"，
+  //   但从没验过【包里那 293 个 js 文件本身有没有语法错】。
+  //   一个语法错 = 学员点某个按钮时 `SyntaxError: Unexpected token`，
+  //   而且报错位置在文件里，学员完全看不懂。
+  //   achun 是纯 Node 工具集（CommonJS），用 `node -c` 就够。
+  console.log('\n⑨ xianyu-achun 的 Node 代码语法');
+  {
+    const jsFiles = [];
+    (function rec(d) {
+      for (const name of fs.readdirSync(d)) {
+        if (name === 'node_modules' || name === '.git') continue;
+        const p = path.join(d, name);
+        const st = fs.statSync(p);
+        if (st.isDirectory()) { rec(p); continue; }
+        if (/\.js$/i.test(name)) jsFiles.push(p);
+      }
+    })(achun);
+
+    const bad = [];
+    for (const f of jsFiles) {
+      try {
+        execFileSync('node', ['-c', f], { stdio: 'pipe', timeout: 20000 });
+      } catch (e) {
+        const msg = String((e.stderr || '') + (e.stdout || ''));
+        const first = (msg.split(/\r?\n/).find(l => /Error/.test(l)) || '').trim();
+        bad.push(path.relative(achun, f).replace(/\\/g, '/') + ': ' + first.slice(0, 80));
+      }
+    }
+    check('achun 的 js 全部语法正确', bad.length === 0,
+      bad.length ? bad.slice(0, 2).join(' | ') : jsFiles.length + ' 个文件');
+  }
+
+  // ── ⑩ 汇总 ──
   const bad = results.filter(r => !r.ok);
   console.log('\n════ 结果 ════');
   console.log('  ' + (results.length - bad.length) + '/' + results.length + ' 通过');
