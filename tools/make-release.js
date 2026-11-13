@@ -221,6 +221,15 @@ function excluded(rel) {
   //     拿到包之后可以用它们复核，而且它们找不到包时会自己说明"这是给技术负责人用的"。）
   /^tools\/make-release\.js$/,
   /^make-release\.js$/,
+  // 【2026-11-13 加·第十三批】第 118 轮扫 --dry 副作用时发现的【老板一次性调度/下架脚本】。
+  //   publish-schedule.js   （18 处写操作没被 !DRY 挡住）
+  //   publish-4groups.js    （写排期锁、改地址）
+  //   republish-bad.js      （会执行 do-offshelf.js —— 下架商品！）
+  //   sheet-command-runner.js（执行控制台命令 + 写 state）
+  //   这些是"某次上架排期 / 重发失败品 / 从飞书表格触发命令"的专用脚本，
+  //   学员不会用，而且 --dry 保护并不完整。
+  /^tools\/(publish-schedule|publish-4groups|republish-bad|sheet-command-runner)\.js$/,
+  /^(publish-schedule|publish-4groups|republish-bad|sheet-command-runner)\.js$/,
   ];
   return rules.some((r) => r.test(f));
 }
