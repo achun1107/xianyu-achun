@@ -23,7 +23,7 @@
  *
  * 用法:
  *   node tools/store-new.js --name="XX票务" --preset=代拍-标准 --copy-sub
- *   node tools/store-new.js --name="XX票务" --from="好易美票务Hope"
+ *   node tools/store-new.js --name="XX票务" --from="<你自己的另一个店>"
  *   node tools/store-new.js --name="XX票务" --account-id=xxxx-... --account-name="XX票务"
  *   node tools/store-new.js --name="XX票务" --dry            # 只看会写什么，不落盘
  *   node tools/store-new.js --list-accounts                  # 看看有哪些闲鱼账号可用/已被占用

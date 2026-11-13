@@ -111,7 +111,11 @@ function sectionStores() {
   let names = [];
   try { names = profile.list(); } catch (e) {}
   if (!names.length) {
-    bad(S1, '店铺档案', 'stores/ 下一份都没有', 'node tools/store-new.js --name="<店铺名>" --from="好易美代拍"');
+    // 【2026-11-13 第 141 轮修】原来这里写 --from="好易美代拍" —— 那是【老板的店】，
+    //   学员机器上根本没有（stores/ 下一份都没有才会走到这条），照抄必然失败。
+    //   学员该用的是包里带的样板：--preset=代拍-标准。
+    bad(S1, '店铺档案', 'stores/ 下一份都没有',
+      'node tools/store-new.js --name="<你的店铺名>" --preset=代拍-标准 --copy-sub');
     return;
   }
   ok(S1, '店铺档案', names.length + ' 份：' + names.join(', '));
