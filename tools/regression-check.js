@@ -124,6 +124,28 @@ has('tools/ad-window.js', /预演模式，不发告警/, '118  ad-window 预演�
 // ── 包内容 ───────────────────────────────────────────────
 has('tools/_build-install-bundle.js', /先看这个-五步上手/, '105  一页纸放到包根');
 
+// ── 学员文档里不该写死包名（每次发包都变，写死了学员照着敲会找不到文件）──
+//   第 128 轮：发放说明里写死了 xianyu-install-20261112-c1dcb39-b214523.zip，
+//   学员拿到的是新包，照着敲报「找不到文件」。交付清单里也有同样的问题。
+{
+  const DOCS = ['发放说明-给学员.md', '交付清单.md', '学员配置手册.md', '给学员的一页说明.md'];
+  const offenders = [];
+  for (const d of DOCS) {
+    const lines = read(d).split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      // 跳过「> 2026-11-13 修：原来这里写死了 xxx」这类【记录行】——
+      //   那是解释历史，不是在让学员照着敲。
+      if (/^\s*>/.test(l)) continue;
+      const m = l.match(/xianyu-install-20\d{6}-[a-f0-9]+/);
+      if (m) { offenders.push(d + ':' + (i + 1) + ' (' + m[0] + ')'); break; }
+    }
+  }
+  offenders.length
+    ? bad('128  学员文档没写死包名', offenders.join(', '))
+    : ok('128  学员文档没写死包名（4 份都查过）');
+}
+
 // ── 文档 ─────────────────────────────────────────────────
 has('管理员手册-分发包维护.md', /## 目录/, '123  管理员手册有目录');
 has('学员配置手册.md', /## 目录/, '124  学员配置手册有目录');
