@@ -246,6 +246,26 @@ function excluded(rel) {
   //   而且 verify 找不到包时会明确说「这个脚本是给技术负责人用的，不是学员工具」。）
   /^tools\/regression-check\.js$/,
   /^tools\/scan-package\.js$/,
+  // 【2026-11-13 加·第十八批，第 138 轮】根层的一次性脚本。
+  //   判据：包里 93 个根层 js，只有 32 个被【任何文档或代码】引用过；
+  //   剩下 61 个连 require 都没有 —— 学员不可能用到，全是老板某次任务跑一遍就丢的。
+  //   这里按前缀排；带具体明星/场次名的单独列（那是真·一次性）。
+  /^(probe-artist-items|probe-budget-dom|probe-detail|probe-image-to-template|probe-item-location|probe-item-traffic|probe-more|probe-offshelf-btn|probe-personal|probe-items-traffic)\.js$/,
+  /^(publish-3-quanzhou-xuliang|publish-quanzhou-xuliang|publish-stagger|publish-api)\.js$/,
+  /^(test-guard-mismatch|test-guard|test-idfilter|test-rebid-gates)\.js$/,
+  /^(check-3new|check-item-images|check-login)\.js$/,
+  /^(gen-3-covers|gen-redtext-cover|gen-via-central)\.js$/,
+  /^raise150-[\w]+\.js$/,
+  /^(xy-scan|xy-snapshot-run|xy-store-data)\.js$/,
+  /^(damai-probe|damai-scan)\.js$/,
+  /^(diag-entity|diag-table)\.js$/,
+  /^(im-conv-dump|im-today)\.js$/,
+  /^(run-add-baby|run-on-console)\.js$/,
+  /^(verify-item-via-agent|verify-publish-3)\.js$/,
+  /^(bal-probe|clean-command-sheet|compare-new5|confirm-render|debug-status-filter)\.js$/,
+  /^(dump-plan-items|find-plans|fix-dangling2|goto-manage|list-by-status)\.js$/,
+  /^(make-cover-layers|push-redtext|read-msgs|restore-96129660|reveal-and-dump)\.js$/,
+  /^(scan-buckets|set-bid|shot-items|sim-templates|stuck-plan|try-relist)\.js$/,
   ];
 
   // ── tools/ 下的 .js 走【白名单】而不是黑名单 ──
