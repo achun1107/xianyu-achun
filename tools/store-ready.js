@@ -1,0 +1,54 @@
+/**
+ * tools/store-ready.js — 确保某个店铺页面已启动就绪（发布 / 巡检的前置）
+ *
+ * 为什么需要它：
+ *   `ensure-agent.js` 只启动 `config.store.active` 里的店铺（现在只有好易美代拍）。
+ *   要操作【不在 active 里】的店铺（比如新接进来的「好易美票务Hope」），
+ *   得先把它的页面拉起来 —— 否则 `eval-on-store` 直接回「店铺未就绪」。
+ *
+ *   顺便兜住服务端那个坑：`POST /api/agent/start-one` 用的是**启动时缓存的账号表**
+ *   （findAccountByName 命中不到不刷新），新加的店铺会回「账号不存在」；
+ *   而 `POST /api/agent/switch` 命中不到时会 refreshAccounts()。
+ *   所以这里：先试 start-one，报「账号不存在」就先 switch 一次刷新，再 start-one。
+ *
+ * 用法:
+ *   node tools/store-ready.js "好易美票务Hope"
+ *   node tools/store-ready.js "好易美票务Hope" "好易美代拍"     # 可以给多个
+ */
+const { post } = require('../lib/http');
+
+const NAMES = process.argv.slice(2).filter((a) => a && !a.startsWith('--'));
+if (!NAMES.length) { console.log('用法: node tools/store-ready.js "<店铺名>" ["<店铺名>" ...]'); process.exit(2); }
+
+const log = (m) => console.log('[' + new Date().toLocaleTimeString('zh-CN') + '] ' + m);
+
+(async () => {
+  let bad = 0;
+  for (const name of NAMES) {
+    let r = await post('/api/agent/start-one', { name }, { timeout: 180000 }).catch((e) => ({ ok: false, error: e.message }));
+    if (!r || r.ok !== true) {
+      const err = String((r && r.error) || '');
+      if (/账号不存在/.test(err)) {
+        log('「' + name + '」start-one 说账号不存在 → 先 switch 一次刷新账号表');
+        const sw = await post('/api/agent/switch', { storeName: name }, { timeout: 180000 }).catch((e) => ({ ok: false, error: e.message }));
+        if (!sw || sw.ok !== true) { log('  ❌ switch 也失败：' + JSON.stringify(sw).slice(0, 140)); bad++; continue; }
+        r = { ok: true, state: sw.state };
+      } else {
+        log('❌「' + name + '」启动失败：' + err);
+        bad++;
+        continue;
+      }
+    }
+
+    // 真去页面里看一眼，别只看返回值
+    try {
+      const v = await post('/api/agent/eval-on-store', { store: name, code: 'JSON.stringify({href:location.href,t:document.title})' }, { timeout: 60000 });
+      const d = typeof v.result === 'string' ? JSON.parse(v.result) : v.result;
+      log('✅「' + name + '」就绪  页面=' + d.href);
+    } catch (e) {
+      log('⚠「' + name + '」启动了但 eval 失败：' + e.message);
+      bad++;
+    }
+  }
+  process.exit(bad ? 1 : 0);
+})().catch((e) => { log('❌ ' + ((e && e.stack) || e)); process.exit(1); });
