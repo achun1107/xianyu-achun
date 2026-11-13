@@ -453,6 +453,23 @@ function pack(repoDir, name, secrets) {
   console.log('  跟踪文件  : ' + files.length + '，打进包 ' + keep.length + '，排除 ' + skipped);
   const bytes = keep.reduce((s, f) => s + fs.statSync(path.join(repoDir, f)).size, 0);
   console.log('  原始体积  : ' + (bytes / 1048576).toFixed(1) + ' MB');
+
+  // 【2026-11-13 加·第 150 轮】提示「有未提交的改动会进包」。
+  //   为什么：本脚本按 `git ls-files` 列文件名，但【内容从磁盘读】（L464 copyFileSync），
+  //   所以工作区里改了没提交的文件照样会进包，而 git 里查不到那版 —— 回滚只能靠人工。
+  //   第 150 轮实测：update.js 的 --middle（中台更新，203 行）在包里、不在 git 里。
+  //   这里只警告不改行为（打包还是要能跑）。
+  try {
+    const dirty = git(repoDir, ['diff', '--name-only']).split(/\r?\n/).filter(Boolean);
+    const dirtyInPack = dirty.filter((f) => keep.includes(f.replace(/\\/g, '/')));
+    if (dirtyInPack.length) {
+      console.log('  ⚠️  未提交改动会进包: ' + dirtyInPack.length + ' 个');
+      dirtyInPack.slice(0, 5).forEach((f) => console.log('        ' + f));
+      if (dirtyInPack.length > 5) console.log('        …还有 ' + (dirtyInPack.length - 5) + ' 个');
+      console.log('        （内容从磁盘读，git 里没有这一版 —— 要保底就先 commit）');
+    }
+  } catch (e) { /* 不是 git 仓就跳过 */ }
+
   if (LIST_ONLY) { keep.forEach((f) => console.log('    ' + f)); return null; }
 
   // ── 先在临时目录拼出来，扫过之后再打 zip ──
