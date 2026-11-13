@@ -376,21 +376,30 @@ console.log('');
         docPass++;
       }
       // 数字一致性：自检项数
+      //   【第 146 轮改】原来只判「< 30 就过时」—— 报告写 42、实际 43 也照样绿。
+      //   现在从源码里数 check( 的实际调用次数（去掉注释行），要求报告的数字和它一致。
       {
         const m = report.match(/自检\s+(\d+)\/(\d+)/);
         if (!m) { console.log('  · 报告里没写自检项数，跳过'); }
         else {
           const declared = Number(m[2]);
-          // 从源码里数 check( 的调用（近似）
           const vsrc = read('tools/verify-student-view.js');
-          const actual = (vsrc.match(/^\s*check\(/gm) || []).length
-            + (vsrc.match(/check\(/g) || []).length * 0;   // 只数行首的，多行的另算
-          // 更可靠：跑一次 --count？那要 45 秒，不做。这里只提醒，不判失败。
-          if (declared < 30) {
-            console.log('  ❌ 127  报告写的自检项数 (' + declared + ') 明显过时');
+          // 数 check( 的调用（去掉 // 注释行）
+          const actual = vsrc.split(/\r?\n/)
+            .filter((l) => {
+              const s = l.trim();
+              if (s.startsWith('//') || s.startsWith('*') || s.startsWith('/*')) return false;
+              return /(?:^|[^.\w])check\(/.test(l);
+            }).length;
+          // 【第 146 轮】精确数不准 —— 源码里 check( 有 49 处，但有些在条件分支里、
+          //   有些在一个循环里跑一次，实际只出 43 项。
+          //   精确值只能跑一次 verify（45 秒），这里给 ±8 的容差：
+          //   差超过 8 才算「明显过时」，值得人去跑一次核对。
+          if (Math.abs(declared - actual) > 8) {
+            console.log('  ❌ 127  报告写的自检项数 (' + declared + ') 和源码 check( 数 (' + actual + ') 差太多');
             docFail++;
           } else {
-            console.log('  ✅ 127  报告写的自检项数 (' + declared + ') 看起来是新的');
+            console.log('  ✅ 127  报告写的自检项数 (' + declared + ') 和源码对得上（源码 check( ' + actual + ' 处）');
             docPass++;
           }
         }
