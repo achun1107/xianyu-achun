@@ -501,7 +501,16 @@ Write-Host '══════════ 剩下必须人工做的三件事 ═
 Write-Host ''
 Write-Host '  开新店：  node tools\store-new.js --list-accounts'
 Write-Host '  看全局：  node tools\store-list.js'
-Write-Host '  操作手册：闲鱼自动化-操作手册.md'
+# 【2026-11-13 改】原来这里写「操作手册：闲鱼自动化-操作手册.md」——
+#   那份是【给管理员/老板看的】，开篇第一句就是「工作目录一律是 D:\DSH\achun」，
+#   学员的目录不是这个，看了只会更糊涂。而且它在解压包的 xianyu-achun\ 里，
+#   学员站在包根目录也找不到。
+#   学员该看的是这两份（包根就有一份一页纸）：
+Write-Host ''
+Write-Host '  想再看一遍怎么用：'
+Write-Host '     先看这个-五步上手.html        （包根，一页纸，五分钟）'
+Write-Host '     xianyu-achun\发放说明-给学员.md（详细版，遇到问题翻）'
+Write-Host '     卡住了：打开网页点右上角「一键体检」，把结果贴给管理员。'
 Write-Host ''
 if ($DryRun) { Write-Host '（DryRun 模式：上面什么都没真的改）' -ForegroundColor Yellow }
 exit 0
