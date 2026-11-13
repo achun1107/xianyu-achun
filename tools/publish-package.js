@@ -88,11 +88,19 @@ function info(msg) { console.log('      ·  ' + msg); }
   if (DRY) { info('[dry] git clone --depth 1 -b gh-pages ' + PAGES_REPO); }
   else {
     try {
+      // 注意：git clone 会把 "Cloning into ..." 写到 stderr ——【即使成功】。
+      //   所以不能用 stderr 非空来判断失败，只能看退出码（execFileSync 退出码非 0 才抛）。
+      //   mkdtempSync 已经建了目录，clone 到已存在的空目录是允许的。
       sh('git', ['clone', '--depth', '1', '-b', 'gh-pages', url, tmp]);
       ok('clone 完成');
     } catch (e) {
-      console.log('      ❌ clone 失败: ' + String(e.stderr || e.message).split('\n')[0]);
-      console.log('         GH_TOKEN 设了吗？set GH_TOKEN=ghp_xxx');
+      console.log('      ❌ clone 失败');
+      // 完整打出来 —— 第 134 轮第一次跑时只打第一行，正好是 "Cloning into..."，
+      // 完全看不出真实原因。
+      const detail = String(e.stderr || e.message || '').trim();
+      detail.split('\n').slice(-6).forEach((l) => console.log('         ' + l));
+      if (!TOKEN) console.log('         💡 没设 GH_TOKEN —— set GH_TOKEN=ghp_xxx');
+      else console.log('         💡 token 可能失效；手动试: git clone --depth 1 -b gh-pages https://github.com/' + PAGES_REPO + '.git <空目录>');
       process.exit(1);
     }
   }
@@ -151,8 +159,20 @@ function info(msg) { console.log('      ·  ' + msg); }
       git(['push', 'origin', 'gh-pages']);
       ok('push 完成');
     } catch (e) {
-      console.log('      ❌ push 失败: ' + String(e.stderr || e.message).split('\n')[0]);
-      process.exit(1);
+      // 第 134 轮实测：第一次 push 失败、重试就成功 —— 常见原因是同时跑了
+      //   _sync-public.js --push（两个 git 进程打同一个远端），或者网络抖动。
+      info('第一次 push 没成功，5 秒后重试一次…');
+      await new Promise((r) => setTimeout(r, 5000));
+      try {
+        git(['push', 'origin', 'gh-pages']);
+        ok('push 完成（重试成功）');
+      } catch (e2) {
+        console.log('      ❌ push 失败');
+        const detail = String(e2.stderr || e2.message || '').trim();
+        detail.split('\n').slice(-8).forEach((l) => console.log('         ' + l));
+        console.log('         💡 常见原因：token 失效 / 同时有别的 git 进程在 push / 网络');
+        process.exit(1);
+      }
     }
   }
   fs.rmSync(tmp, { recursive: true, force: true });
