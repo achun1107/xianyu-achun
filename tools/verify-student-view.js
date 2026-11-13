@@ -323,7 +323,52 @@ const check = (name, ok, detail) => {
       bad.length ? bad.slice(0, 2).join(' | ') : jsFiles.length + ' 个文件');
   }
 
-  // ── ⑩ 汇总 ──
+  // ── ⑩ 所有 HTML 里的内联 <script> ──
+  //   为什么加（2026-11-13）：学员天天用的 staff-ui 页面（ui.html）有 11.7 KB 内联 JS。
+  //   一个语法错 = 打开网页一片空白，浏览器控制台里的报错学员根本不会去看。
+  //   内联脚本不在任何 .js 文件里，所以 ⑧⑨ 两组都覆盖不到。
+  console.log('\n⑩ HTML 里的内联脚本语法');
+  {
+    const htmlFiles = [];
+    (function rec(d) {
+      for (const name of fs.readdirSync(d)) {
+        if (name === 'node_modules' || name === '.git') continue;
+        const p = path.join(d, name);
+        const st = fs.statSync(p);
+        if (st.isDirectory()) { rec(p); continue; }
+        if (/\.html$/i.test(name)) htmlFiles.push(p);
+      }
+    })(root);
+
+    let totalBlocks = 0;
+    const htmlBad = [];
+    const tmpd = fs.mkdtempSync(path.join(os.tmpdir(), 'xy-inl-'));
+    let bi = 0;
+    for (const f of htmlFiles) {
+      const html = fs.readFileSync(f, 'utf8');
+      const matches = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
+      for (const m of matches) {
+        const js = m[1];
+        if (!js.trim()) continue;
+        totalBlocks++;
+        const dst = path.join(tmpd, 'blk' + (++bi) + '.mjs');
+        fs.writeFileSync(dst, js, 'utf8');
+        try {
+          execFileSync('node', ['--check', dst], { stdio: 'pipe', timeout: 20000 });
+        } catch (e) {
+          const msg = String((e.stderr || '') + (e.stdout || ''));
+          const first = (msg.split(/\r?\n/).find(l => /SyntaxError/.test(l)) || '').trim();
+          if (first) htmlBad.push(path.relative(root, f).replace(/\\/g, '/') + ': ' + first.slice(0, 70));
+        }
+      }
+    }
+    try { fs.rmSync(tmpd, { recursive: true, force: true }); } catch (e) {}
+
+    check('HTML 内联脚本没有语法错误', htmlBad.length === 0,
+      htmlBad.length ? htmlBad.slice(0, 2).join(' | ') : htmlFiles.length + ' 个 HTML / ' + totalBlocks + ' 块脚本');
+  }
+
+  // ── ⑪ 汇总 ──
   const bad = results.filter(r => !r.ok);
   console.log('\n════ 结果 ════');
   console.log('  ' + (results.length - bad.length) + '/' + results.length + ' 通过');
