@@ -317,7 +317,32 @@ else {
             $code = $LASTEXITCODE
             Pop-Location
             if ($code -eq 0 -and (Test-Path (Join-Path $svcModules 'express'))) { Ok '服务依赖装好' }
-            else { Miss '服务依赖安装失败（退出码 ' + $code + '）—— 进 ' + $SvcDir + ' 手动跑 npm install' }
+            else {
+                # 【2026-11-13 改】原来只说「进 xxx 手动跑 npm install」。
+                #   学员照做，还是失败 —— 因为卡住的往往不是 npm 本身，是 Chromium（约 150 MB）
+                #   从境外 CDN 下载。这一步在国内网络上超时是最常见的原因。
+                #   把三种真实原因和对应的做法列出来，别让人反复重试同一件不会成功的事。
+                Miss ('服务依赖安装失败（退出码 ' + $code + '）')
+                Write-Host ''
+                Write-Host '         这一步要下 Chromium（约 150 MB），卡住多半是下面三种之一：'
+                Write-Host ''
+                Write-Host '         ① 网络超时（最常见）—— 换国内镜像重试：'
+                Write-Host '              npm config set registry https://registry.npmmirror.com'
+                Write-Host '              set PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright'
+                Write-Host '            然后【关掉这个窗口】重新双击 install.cmd'
+                Write-Host ''
+                Write-Host '         ② 磁盘不够 —— 这一步要留 500 MB 以上'
+                Write-Host '             看一下 C 盘剩余空间（我的电脑 → 右键 C 盘 → 属性）'
+                Write-Host ''
+                Write-Host '         ③ 杀毒软件拦住了 node.exe'
+                Write-Host '             临时关掉杀毒的「实时防护」，装完再打开'
+                Write-Host ''
+                Write-Host '         想手动重跑：'
+                Write-Host ('             cd "' + $SvcDir + '"')
+                Write-Host '             npm install'
+                Write-Host ''
+                Write-Host '         还是不行就把上面整段输出发给管理员。'
+            }
         }
     }
 }
