@@ -315,6 +315,62 @@ const check = (name, ok, detail) => {
       check('学员文档引用的文件都在包里', uniqGone.length === 0,
         uniqGone.length ? uniqGone.slice(0, 3).join(' | ') : refCount + ' 个引用');
     }
+
+    // ⑥ 所有学员文档里的 node 命令，脚本存在 + 参数脚本认
+    //   为什么加（2026-11-13）：⑦ 的前五项只查 install-guide.html 一份。
+    //   可学员手上还有另外四份文档（真机清单 / 发放说明 / 任务书 / 错误速查），
+    //   那里面也有大量 `node tools\xxx.js --flag`。哪份写错了都是同一个后果：
+    //   学员照着敲，跑不起来，而且他不知道自己敲错还是程序坏了。
+    //   实测（第 104 轮）：六份文档共 43 行命令，16 条 node 脚本全部存在、参数全对。
+    {
+      const DOCS = [
+        'install-guide.html',
+        'xianyu-achun/真机首装验证清单.md',
+        'xianyu-achun/发放说明-给学员.md',
+        'xianyu-achun/管理员手册-分发包维护.md',
+        'xianyu-achun/学员安装-给学员DSH.md',
+        'xianyu-achun/学员常见错误速查.md',
+      ];
+      const badCmds = [];
+      let cmdCount = 0;
+      // 这两个是【维护者文档里提到、但不在 xianyu-achun 包里】的：
+      //   _build-install-bundle.js —— 打包脚本，只在开发机上有（make-release 不把它发出去）
+      //   server.js —— 在 xianyu-playwright-service 里，是另一个仓库的入口
+      // 它们在管理员手册里出现是正常的，不该报"缺"。
+      const NOT_IN_ACHUN = new Set(['tools/_build-install-bundle.js', 'server.js']);
+      for (const rel of DOCS) {
+        const dp = path.join(root, rel.split('/').join(path.sep));
+        if (!fs.existsSync(dp)) continue;
+        const t = fs.readFileSync(dp, 'utf8');
+        // 抓 node <脚本> <后面到行尾>
+        for (const m of t.matchAll(/node\s+((?:tools[\\/])?[\w.\-]+\.js)([^\r\n`]*)/g)) {
+          const script = m[1].split('\\').join('/');
+          const rest = m[2] || '';
+          // 只跳过"示例脚本名"，不因为带占位符就整条跳过 ——
+          //   学员文档里绝大多数命令都带 <店铺名> 这类占位符，
+          //   但【参数】部分仍然是真的，写错了照样跑不起来（第 104 轮反向验证踩过：
+          //   因为整条跳过，往文档里塞 --fakeflag=1 都抓不到）。
+          if (/xxx|example/i.test(script)) continue;
+          if (NOT_IN_ACHUN.has(script)) continue;      // 见上面注释
+          cmdCount++;
+          const sp = path.join(achun, script);
+          if (!fs.existsSync(sp)) {
+            badCmds.push(path.basename(rel) + ': 缺 ' + script);
+            continue;
+          }
+          // 参数：脚本文件里出现过这个 --flag 就算认
+          const src = fs.readFileSync(sp, 'utf8');
+          for (const f of rest.matchAll(/(--[a-z][a-z0-9-]*)/g)) {
+            if (src.indexOf(f[1]) < 0) {
+              badCmds.push(path.basename(rel) + ': ' + script + ' 没有 ' + f[1]);
+            }
+          }
+        }
+      }
+      const uniqBad = [...new Set(badCmds)];
+      check('六份文档里的 node 命令都能跑', uniqBad.length === 0,
+        uniqBad.length ? uniqBad.slice(0, 3).join(' | ') : cmdCount + ' 条命令');
+    }
   }
 
   // ── ⑧ 扩展代码（monitor）的语法检查 ──
