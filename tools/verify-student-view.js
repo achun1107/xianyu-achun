@@ -301,7 +301,9 @@ const check = (name, ok, detail) => {
     const tmpd = fs.mkdtempSync(path.join(os.tmpdir(), 'xy-syn-'));
     for (const f of jsFiles) {
       const dst = path.join(tmpd, path.basename(f).replace(/\.js$/i, '') + '_' + Math.random().toString(36).slice(2, 8) + '.mjs');
-      fs.copyFileSync(f, dst);
+      // 复制失败就跳过这个文件（实测遇到过一次 ENOENT：源明明在，copyfile 报错）。
+      // 检查脚本不该因为一个文件读不到就整体崩掉 —— 跳过它、继续查其余的，比全崩有用。
+      try { fs.copyFileSync(f, dst); } catch (e) { continue; }
       try {
         execFileSync('node', ['--check', dst], { stdio: 'pipe', timeout: 30000 });
       } catch (e) {
