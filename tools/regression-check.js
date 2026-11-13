@@ -333,6 +333,31 @@ has('tools/_install-guide.html.js', /先看这个-五步上手/, '106  详细版
     : ok('140  被代码调用的 tools/*.js 都在白名单');
 }
 
+// ── 大文档的目录锚点必须对得上 ──
+//   第 123/124/147 轮，同一件事错了【三次】：手工写 TOC 的锚点，每次都把中文标点
+//   （、：（））去掉，而 GitHub 的锚点规则是【只去 ASCII 标点】。结果点目录跳不动。
+//   正确做法是「从标题自动生成锚点」—— 这条把它变成自动检查。
+{
+  const DOCS = ['管理员手册-分发包维护.md', '学员配置手册.md', '交付状态-2026-11-13.md'];
+  // GitHub 锚点规则（准确版）：转小写 → 去掉 ASCII 标点 → 空格换连字符
+  const toAnchor = (s) => s.toLowerCase()
+    .replace(/[!"#$%&()*+,./:;<=>?@[\]^`{|}~]/g, '')
+    .replace(/\s+/g, '-');
+  const broken = [];
+  for (const d of DOCS) {
+    const t = read(d);
+    if (!t) continue;
+    const anchors = [...t.matchAll(/\]\(#([^)]+)\)/g)].map((m) => m[1]);
+    if (!anchors.length) continue;                    // 没目录的跳过
+    const real = new Set([...t.matchAll(/^## (.+)$/gm)].map((m) => toAnchor(m[1].trim())));
+    const bad = anchors.filter((a) => !real.has(a));
+    if (bad.length) broken.push(d + '（' + bad.length + ' 个: ' + bad[0].slice(0, 20) + '…）');
+  }
+  broken.length
+    ? bad('148  三份大文档的目录锚点都对得上', broken.join(' | '))
+    : ok('148  三份大文档的目录锚点都对得上');
+}
+
 console.log('');
 console.log('  ─────────────');
 console.log('  ' + pass + ' 通过 / ' + fail + ' 失败');
