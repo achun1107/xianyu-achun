@@ -114,10 +114,49 @@ function main() {
     }
 
     console.log('');
-    if (bad) {
-      console.log('  ❌ ' + bad + ' 个会甩英文报错给学员');
+    // ── 带参数的专项（无参跑不到的错误分支）──
+    //   第 158 轮：`store-ready.js "不存在的店"` 原来甩的是 API 原文
+    //     ❌ switch 也失败：{"ok":false,"error":"账号未找到: 测试店"}
+    //   学员照手册敲这条命令（名字打错 / 还没配店）必然撞上。
+    //   无参数跑只能看到用法，抓不到这类 —— 所以单独列几条。
+    console.log('  带参数的专项（验错误分支的文案）');
+    const WITH_ARGS = [
+      {
+        args: ['tools/store-ready.js', '冒烟测试-不存在的店'],
+        // 期望：中文说清「没有这个店」，并且【不要】甩 {"ok":false,...} 这种 API 原文
+        must: [/没有叫「冒烟测试-不存在的店」的店铺/],
+        mustNot: [/\{"ok":false/],
+      },
+    ];
+    let argBad = 0;
+    for (const c of WITH_ARGS) {
+      const abs = path.join(achun, c.args[0]);
+      if (!fs.existsSync(abs)) { console.log('  ❌ ' + c.args[0] + ' 不在包里'); argBad++; continue; }
+      let out = '';
+      try {
+        out = execFileSync(process.execPath, [abs].concat(c.args.slice(1)),
+          { cwd: achun, encoding: 'utf8', timeout: 120000, stdio: ['ignore', 'pipe', 'pipe'] });
+      } catch (e) {
+        out = String((e.stdout || '') + (e.stderr || ''));
+      }
+      const miss = c.must.filter((re) => !re.test(out));
+      const leak = c.mustNot.filter((re) => re.test(out));
+      if (!miss.length && !leak.length) {
+        console.log('  ✅ ' + c.args[0] + ' ' + c.args[1] + '  → 中文提示到位');
+      } else {
+        argBad++;
+        console.log('  ❌ ' + c.args[0] + ' ' + c.args[1]);
+        miss.forEach((re) => console.log('       缺少期望文案: ' + re));
+        leak.forEach((re) => console.log('       泄漏了原文: ' + re + '  → ' + (out.match(re) || [''])[0].slice(0, 80)));
+      }
+    }
+
+    console.log('');
+    if (bad || argBad) {
+      const n = bad + argBad;
+      console.log('  ❌ ' + n + ' 个会甩英文报错给学员');
       console.log('     修法：识别出这个分支，给中文说明 + 告诉学员下一步该做什么');
-      console.log('     （参考 144 轮 publish-one、151 轮 update.js、152 轮 scrub-secrets）');
+      console.log('     （参考 144 轮 publish-one、151 轮 update.js、152 轮 scrub-secrets、158 轮 store-ready）');
       console.log('');
       return 1;
     }

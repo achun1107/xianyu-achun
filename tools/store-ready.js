@@ -15,7 +15,7 @@
  *   node tools/store-ready.js "好易美票务Hope"
  *   node tools/store-ready.js "好易美票务Hope" "好易美代拍"     # 可以给多个
  */
-const { post } = require('../lib/http');
+const { post, get } = require('../lib/http');
 
 const NAMES = process.argv.slice(2).filter((a) => a && !a.startsWith('--'));
 if (!NAMES.length) { console.log('用法: node tools/store-ready.js "<店铺名>" ["<店铺名>" ...]'); process.exit(2); }
@@ -31,7 +31,32 @@ const log = (m) => console.log('[' + new Date().toLocaleTimeString('zh-CN') + ']
       if (/账号不存在/.test(err)) {
         log('「' + name + '」start-one 说账号不存在 → 先 switch 一次刷新账号表');
         const sw = await post('/api/agent/switch', { storeName: name }, { timeout: 180000 }).catch((e) => ({ ok: false, error: e.message }));
-        if (!sw || sw.ok !== true) { log('  ❌ switch 也失败：' + JSON.stringify(sw).slice(0, 140)); bad++; continue; }
+        if (!sw || sw.ok !== true) {
+          const swErr = String((sw && sw.error) || '');
+          // 【2026-11-14 第 158 轮】学员最容易撞到的就是这条：店名打错了，
+          //   或者还没配这个店就跑 store-ready。原来这里直接 JSON.stringify(sw)，
+          //   屏幕上是一句 API 原文 ——
+          //       ❌ switch 也失败：{"ok":false,"error":"账号未找到: 测试店"}
+          //   既看不懂，也不知道下一步干嘛（和 144/151/152/153 轮那几类同一个毛病）。
+          //   改成：说清是哪种情况 + 把 8093 里现有的店列出来，省得他再开网页找。
+          if (/账号未找到|账号不存在|not found/i.test(swErr) || /账号不存在/.test(err)) {
+            log('  ❌ 8093 里没有叫「' + name + '」的店铺。');
+            log('    两个可能：');
+            log('       ① 名字打错了 —— 要和网页右上角「店铺：xxx ▾」显示的一模一样');
+            log('       ② 还没配这个店 —— 打开网页点「⑤ 配置一家新店」，五步填完再来');
+            try {
+              const acc = await get('/api/agent/accounts', { timeout: 15000 });
+              const list = (acc && (acc.data || acc.accounts)) || [];
+              const names = list.map((a) => a.name).filter(Boolean);
+              log('     8093 里现有的店：' + (names.length ? names.join(' / ') : '（一个都还没有）'));
+            } catch (e) { /* 列不出来就算了 —— 别让这一步反而报错 */ }
+            bad++;
+            continue;
+          }
+          log('  ❌ switch 也失败：' + JSON.stringify(sw).slice(0, 140));
+          bad++;
+          continue;
+        }
         r = { ok: true, state: sw.state };
       } else if (/请先调用 start-all|no agent|浏览器.*没.*启动/i.test(err)) {
         // 2026-11-13 加：agent 被 stop 掉之后（或服务刚重启还没 start-all），
