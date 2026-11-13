@@ -146,6 +146,51 @@ has('tools/_build-install-bundle.js', /先看这个-五步上手/, '105  一页�
     : ok('128  学员文档没写死包名（4 份都查过）');
 }
 
+// ── 同一知识点在多处文档讲，讲法必须一致 ──
+//   第 129-131 轮踩的：`service.local.json` 怎么填，散在 4 份文档里，
+//   改的时候一轮只想起改一处（129 改发放说明、130 改 install-guide、
+//   131 才发现一页说明和 DSH 任务书也没改）。同理 `<版本>` 占位符也是
+//   128 轮改了发放说明、131 轮才发现 DSH 任务书里还有。
+//   这条把「该一致的三要素」自动查一遍。
+{
+  // ① 讲 localAccounts 的地方，必须有结构示例 + 尖括号提示
+  //   注意：只查【真的在讲怎么填】的，只提文件名的不算（那种该指向别处）
+  const DOCS = ['发放说明-给学员.md', '给学员的一页说明.md', '学员安装-给学员DSH.md', '学员配置手册.md'];
+  const bad1 = [];
+  for (const d of DOCS) {
+    const t = read(d);
+    if (!t) continue;
+    const mentionsFill = /localAccounts/.test(t);
+    if (!mentionsFill) continue;                      // 只提文件名的不算
+    const hasStruct = /"localAccounts"\s*:\s*\[/.test(t);
+    const hasBracket = /别把尖括号/.test(t);
+    if (!hasStruct) bad1.push(d + '（缺结构示例）');
+    if (!hasBracket) bad1.push(d + '（缺尖括号提示）');
+  }
+  bad1.length
+    ? bad('131  service.local.json 四处讲法一致', bad1.join(', '))
+    : ok('131  service.local.json 四处讲法一致');
+
+  // ② install-guide.html 也要有一份（它是包根的第一入口）
+  const g = read('tools/_install-guide.html.js');
+  const gOk = /"localAccounts"\s*:\s*\[/.test(g) && /别把尖括号/.test(g);
+  gOk ? ok('131  install-guide 也有结构示例 + 尖括号提示')
+    : bad('131  install-guide 讲法不全');
+
+  // ③ 有 Get-FileHash 的地方，不能用 <版本> 这种占位符
+  const ALL = ['发放说明-给学员.md', '学员安装-给学员DSH.md', '给学员的一页说明.md',
+    '真机首装验证清单.md', '管理员手册-分发包维护.md'];
+  const bad3 = [];
+  for (const d of ALL) {
+    const t = read(d);
+    if (!t) continue;
+    if (/Get-FileHash\s+\.\\?[^\n]*<[^>]+>/.test(t)) bad3.push(d);
+  }
+  bad3.length
+    ? bad('131  校验命令没用 <版本> 占位符', bad3.join(', '))
+    : ok('131  校验命令没用 <版本> 占位符');
+}
+
 // ── 文档 ─────────────────────────────────────────────────
 has('管理员手册-分发包维护.md', /## 目录/, '123  管理员手册有目录');
 has('学员配置手册.md', /## 目录/, '124  学员配置手册有目录');
