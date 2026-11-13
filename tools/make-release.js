@@ -311,6 +311,14 @@ const TOOLS_ALLOWED = new Set([
   'dump-store-config.js', 'print-paths.js',
   // 出图 / 文案
   'make-base-img.js', 'rebuild-covers-and-desc.js',
+  // 【2026-11-14 第 161 轮加·回归修复】make-templates-from-example.js 必须进包：
+  //   install.ps1 L438 会调它生成 ~/.xianyu-templates.json（文案模板库）。
+  //   第 137 轮手写白名单时漏了它 → 包里没有 → 学员机上：
+  //     install.ps1 报「缺 tools\make-templates-from-example.js —— 不影响发布」
+  //     然后 first-publish.js 因为读不到模板库直接报「❌ 读不到文案模板」
+  //   这是「装的时候看着没事、第一次发链接才炸」的那类问题。
+  //   （.ps1 里的引用原来扫不到 —— check-refs 只扫 .js，第 161 轮把它也扫上。）
+  'make-templates-from-example.js',
   // 上架 / 验证
   'first-publish.js', 'publish-group.js', 'verify-published.js',
   'probe-item-sku.js', 'set-item-sku.js',

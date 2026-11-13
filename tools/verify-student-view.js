@@ -821,6 +821,8 @@ const check = (name, ok, detail) => {
       'dump-store-config.js', 'print-paths.js',
       // 出图 / 文案
       'make-base-img.js', 'rebuild-covers-and-desc.js',
+      // 【第 161 轮】install.ps1 会调它生成文案模板库（漏了它 = 学员第一次发链接就炸）
+      'make-templates-from-example.js',
       // 上架 / 验证
       'first-publish.js', 'publish-group.js', 'verify-published.js',
       'probe-item-sku.js', 'set-item-sku.js',

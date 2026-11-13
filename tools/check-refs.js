@@ -91,7 +91,11 @@ function main() {
     })(A, 0);
 
     const jsFiles = [...have].filter((f) => /\.(js|mjs|cjs)$/.test(f));
-    console.log('  包内 js: ' + jsFiles.length + ' 个\n');
+    // 【第 161 轮加】.ps1 / .cmd / .bat 里也会引用 tools\xxx.js ——
+    //   原来只扫 .js，于是 install.ps1 调 make-templates-from-example.js 这种
+    //   「安装器要跑的脚本被白名单排掉了」完全扫不到，直到学员机上装完才发现。
+    const shellFiles = [...have].filter((f) => /\.(ps1|cmd|bat)$/i.test(f));
+    console.log('  包内 js: ' + jsFiles.length + ' 个，shell: ' + shellFiles.length + ' 个\n');
 
     const problems = [];
 
@@ -145,8 +149,29 @@ function main() {
       }
     }
 
+    // ④ .ps1 / .cmd / .bat 里引用的 tools\xxx.js
+    //   【第 161 轮加】install.ps1 会调 make-templates-from-example.js 生成文案模板库，
+    //   而那个脚本被 tools 白名单排掉了 —— 于是学员机上：
+    //     install.ps1 报「缺 ... 不影响发布」，然后 first-publish 因为没模板库直接炸。
+    //   这类「安装器要跑的脚本不在包里」原来完全扫不到（只扫 .js）。
+    for (const rel of shellFiles) {
+      const abs = path.join(A, rel);
+      let t;
+      try { t = fs.readFileSync(abs, 'utf8'); } catch (e) { continue; }
+      const found = new Set();
+      // 'tools\xxx.js' / 'tools/xxx.js' 字符串字面量
+      for (const m of t.matchAll(/['"](?:\.\\)?tools[\\/]([\w.\-]+\.js)['"]/g)) found.add('tools/' + m[1]);
+      // Join-Path $x 'tools\xxx.js'
+      for (const m of t.matchAll(/Join-Path\s+\$\w+\s+'tools[\\/]([\w.\-]+\.js)'/gi)) found.add('tools/' + m[1]);
+      for (const target of found) {
+        if (have.has(target)) continue;
+        if (problems.some((p) => p.file === rel && p.what.includes(target))) continue;
+        problems.push({ file: rel, what: target, why: 'shell 脚本引用的文件不在包里（.ps1/.cmd 原来扫不到）' });
+      }
+    }
+
     if (!problems.length) {
-      console.log('  ✅ 包内代码引用的文件都在（require / runScript / readFile 三类都查了）');
+      console.log('  ✅ 包内代码引用的文件都在（require / runScript / readFile / .ps1 四类都查了）');
       console.log('');
       return 0;
     }
