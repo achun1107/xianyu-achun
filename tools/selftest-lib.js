@@ -96,6 +96,36 @@ const logmod = require('../lib/log');
   const ok30 = '【代拍必中】王嘉尔广州站演唱会首开接代拍首开代抢王嘉尔演唱会';
   assert(FIT(ok30) === ok30, '刚好 30 字的标题原样保留');
 
+  // ── 店铺档案的严格性（lib/store-profile.js）──
+  //   为什么加（2026-11-13）：注释里承诺「档案写了但值非法 → 报错退出，绝不静默回落」，
+  //   实测 7 种非法值只有 1 种（所在地模式）做到了。最坑的是版式 id 写错：
+  //   原来只往 stderr 喷一行，然后按「不存在的版式」继续出图 —— 图是错的，但没人知道。
+  const sp = require('../lib/store-profile');
+  const fakeProfile = { name: '断言用假档案', 主图: { templates: ['xuliang-v1', '这个版式不存在'] } };
+  let strictOk = false;
+  try {
+    sp.resolveTemplates(fakeProfile);
+  } catch (e) {
+    strictOk = /没登记的版式 id/.test(String(e.message));
+  }
+  assert(strictOk, '版式 id 写错会抛错（不静默出图）');
+
+  // 现有档案必须都能解析（别把自己的店误伤了）
+  let allProfilesOk = true;
+  let badProfile = '';
+  const storeNames = sp.list();
+  for (const nm of storeNames) {
+    try {
+      sp.resolveTemplates(sp.load(nm));
+    } catch (e) {
+      allProfilesOk = false;
+      badProfile = nm;
+      break;
+    }
+  }
+  assert(allProfilesOk,
+    '现有 ' + storeNames.length + ' 个店的档案都能解析' + (badProfile ? '（坏的是 ' + badProfile + '）' : ''));
+
   // ── 服务 ──
   const up = await http.alive();
   out.kv('服务存活', up ? '是' : '否');
