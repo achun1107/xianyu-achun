@@ -593,6 +593,43 @@ const check = (name, ok, detail) => {
       const uniqBad = [...new Set(badCmds)];
       check('六份文档里的 node 命令都能跑', uniqBad.length === 0,
         uniqBad.length ? uniqBad.slice(0, 3).join(' | ') : cmdCount + ' 条命令');
+
+      // ⑦之四 行内反引号里提到的 node 脚本也要在
+      //   为什么加（第 204 轮）：上面的 ⑦ 只扫【代码块】里的命令，
+      //   而「跑 `node tools/foo.js`」这种写在行内反引号里的，它抓不到。
+      //   实测（第 204 轮）全包扫出157 处提及、24 处找不到 —— 逐条核完：
+      //   22 处是管理员手册教维护者的工具（在 NOT_IN_ACHUN）、
+      //   1 处是 dev-only 的 details 段、1 处是占位符 xxx.js。
+      //   也就是说【目前没有真问题】，但这个口子得堵上：以后往学员文档里
+      //   写一句行内引用而那个脚本被排掉了，这条就会红。
+      {
+        const probsInline = [];
+        let nInline = 0;
+        for (const rel of DOCS) {
+          // ⚠️ DOCS 里的路径是相对【包根】的（'xianyu-achun/xxx.md'），
+          //    不是相对 achun —— 第 204 轮第一版写成 join(achun, rel)，
+          //    拼出 xianyu-achun/xianyu-achun/xxx.md，全部找不到 → 计数 0。
+          const p = path.join(root, rel);
+          if (!fs.existsSync(p)) continue;
+          let t;
+          try { t = fs.readFileSync(p, 'utf8'); } catch (e) { continue; }
+          const clean = t.replace(/<!--[\s\S]*?-->/g, '');
+          for (const m of clean.matchAll(/node\s+((?:\.\/)?(?:tools[\\\/])?[\w\u4e00-\u9fa5.-]+\.js)/g)) {
+            nInline++;
+            const spec = m[1].replace(/\\/g, '/').replace(/^\.\//, '');
+            const base = path.basename(spec);
+            if (base === 'xxx.js') continue;                       // 文档里的占位符
+            const inPkg = fs.existsSync(path.join(achun, spec))
+              || fs.existsSync(path.join(achun, 'tools', base))
+              || fs.existsSync(path.join(achun, base));
+            if (inPkg) continue;
+            if (NOT_IN_ACHUN.has(spec) || NOT_IN_ACHUN.has('tools/' + base)) continue;
+            probsInline.push(rel + ' → ' + m[1]);
+          }
+        }
+        check('行内提到的 node 脚本都在包里（或标了维护者专用）', probsInline.length === 0,
+          probsInline.length ? [...new Set(probsInline)].slice(0, 3).join(' | ') : nInline + ' 处提及');
+      }
     }
   }
 
