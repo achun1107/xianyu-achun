@@ -1260,6 +1260,35 @@ const check = (name, ok, detail) => {
         }
       }
     })(root, 0);
+
+    // ⑭之四 三个 .cmd 的【关键中文提示】必须还在
+    //   为什么加（第 217 轮）：第175/176 轮把 run-node / 启动 / 体检 的英文提示
+    //   换成了中文（找不到 node、服务已停止、按任意键继续、退出码说明）。
+    //   ⑭之三 只管【行尾和编码】，不管内容 —— 哪天被人改回英文它照样绿。
+    //   这里静态断言四个关键串，每个都对应一次具体的修复。
+    {
+      const MARKS = [
+        ['run-node.cmd', '找不到 node', '第176 轮：no node found → 中文'],
+        ['tools/staff-ui/启动.cmd', '服务已停止', '第176 轮：Server stopped → 中文'],
+        ['体检.cmd', '按任意键继续', '第175 轮：Press any key → set /p 中文'],
+        ['体检.cmd', '退出码', '第176 轮：exit code 说明 → 中文'],
+      ];
+      const missMarks = [];
+      for (const [rel, marker, why] of MARKS) {
+        const p = path.join(achun, rel);
+        if (!fs.existsSync(p)) { missMarks.push(rel + ' 不在包里（' + why + '）'); continue; }
+        const buf = fs.readFileSync(p);
+        let txt = '';
+        try {
+          txt = new TextDecoder('utf-8').decode(buf);
+          if (txt.includes('�')) txt = new TextDecoder('gbk').decode(buf);
+        } catch (e) { txt = buf.toString('latin1'); }
+        if (!txt.includes(marker)) missMarks.push(rel + ' 缺「' + marker + '」（' + why + '）');
+      }
+      check('三个 .cmd 的关键中文提示都在', missMarks.length === 0,
+        missMarks.length ? missMarks.slice(0, 3).join(' | ') : '找不到 node / 服务已停止 / 按任意键继续 / 退出码');
+    }
+
     check('包内 .cmd/.bat/.ps1 的行尾、字符与 BOM', probs.length === 0,
       probs.length ? probs.slice(0, 3).join(' | ') : n + ' 个文件');
   }
