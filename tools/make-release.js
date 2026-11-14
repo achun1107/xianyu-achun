@@ -333,6 +333,15 @@ function excluded(rel) {
   /^(damai-plan-list\.js|damai-recon\.js|probe-damai\.js)$/,                     // playwright-service 的大麦探测
   /^(ad_ledger\.py|CODE_REVIEW\.md|操作记录-[\d-]+\.md|闲鱼项目合体研究-完整报告\.md)$/,
   /^console-tools\/(capture-sku|dump-items|find-item-api|tmp-today)\.js$/,
+  // 【第 211 轮·第二十六批】复查孤儿（第179–181 轮的方法重跑一遍，看新增变化）。
+  //   判据：全包文本里【文件名只出现1 次】= 只有自己 = 没人读它。
+  //   再核一层「学员会碰的文件（9 文档 + 根入口 + tools/）提没提」——
+  //   8 个零提及 + shows.json（只在一句注释里被说「不用它」）。
+  //   ⚠️ 保留（都查过）：
+  //     · 工程纪律.md / 新店上架SOP-给员工和代理.md ← 一页纸「想更深入了解」列着
+  //     · xianyu-商品索引.csv ← staff-ui/server.js L127 真的在读
+  //     · config.local.json.example / PACKAGE-README.txt / 交付状态 ← 已知保留
+  /^(check-client-decl\.mjs|final-check\.js|fix-live-titles\.js|probe-status-dom\.js|rebuild-publish-baseline\.js|unify-desc\.js|unify-live-desc\.js|verify-gen\.js|shows\.json)$/,
   ];
 
   // ── tools/ 下的 .js 走【白名单】而不是黑名单 ──
