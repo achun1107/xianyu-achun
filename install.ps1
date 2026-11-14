@@ -265,11 +265,11 @@ if (-not $InstallCode) {
             $gotRemote = $true
         } else {
             Warn ('中台返回 ok!=true：' + ($resp | ConvertTo-Json -Compress -Depth 4))
-            Miss '中台没有下发配置 —— 装好骨架后把 config.local.json 补齐再重跑'
+            Miss '中台还没下发配置（这个端点尚未就绪，属正常）—— 复制 config.local.json.example 成 config.local.json，照里面每段的 _说明 填好再重跑'
         }
     } catch {
         Warn ('中台不可达 / 安装码失效：' + $_.Exception.Message)
-        Miss '中台没有下发配置 —— 装好骨架后把 config.local.json 补齐再重跑'
+        Miss '中台还没下发配置（网络不通或端点没建）—— 复制 config.local.json.example 成 config.local.json，照里面每段的 _说明 填好再重跑'
     }
 }
 if ($gotRemote -and -not $DryRun) {
