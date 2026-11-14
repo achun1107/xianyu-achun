@@ -932,6 +932,7 @@ const check = (name, ok, detail) => {
     //   源码里 ok(/bad( 只有 31 处，实际输出 43 项，差 12 超过 ±8 容差。
     //   → 这个检查只能由【跑一次 regression】来验，那就放在发包的人身上，
     //     不放进每轮都跑的 verify。
+    //   （自检项数那条挪到 ⑯ 汇总前了 —— 那时 results.length 才是真数。）
   }
 
   // ── ⑬ 学员独立入口文件 ──
@@ -1319,6 +1320,31 @@ const check = (name, ok, detail) => {
   }
 
   // ── ⑯ 汇总 ──
+  // ⑩ 交付清单里写的「N 项自动检查」要和实际跑出来的数对得上
+  //   为什么加（第 206 轮）：交付清单写的是「28 项」，实际早就53 了 ——
+  //   加检查那几轮没人更新它，一路错着发出去。
+  //   ⚠️ 放在汇总【前】才有意义：这时 results.length 已经是真数，
+  //   再 +1 把这条自己算进去 → 精确比对，不需要容差。
+  //   （放在中间用「数源码 check(」的办法不行：源码61 处、实际输出54，
+  //    因为有些 check 在条件分支里，差7 已经逼近 ±8 容差。）
+  {
+    const listPath = path.join(achun, '交付清单.md');
+    if (!fs.existsSync(listPath)) {
+      check('交付清单写的自检项数和实际对得上', false, '找不到交付清单.md');
+    } else {
+      const rep = fs.readFileSync(listPath, 'utf8');
+      const m = rep.match(/(\d+)\s*项自动检查/);
+      if (!m) {
+        check('交付清单写的自检项数和实际对得上', false, '清单里没写「N 项自动检查」');
+      } else {
+        const declared = Number(m[1]);
+        const actual = results.length + 1;   // +1 = 这条自己
+        check('交付清单写的自检项数和实际对得上', declared === actual,
+          declared === actual ? actual + ' 项对上' : '清单写 ' + declared + '、实际 ' + actual);
+      }
+    }
+  }
+
   const bad = results.filter(r => !r.ok);
   console.log('\n════ 结果 ════');
   console.log('  ' + (results.length - bad.length) + '/' + results.length + ' 通过');

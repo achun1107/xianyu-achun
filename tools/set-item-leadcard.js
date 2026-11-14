@@ -53,8 +53,14 @@ const V = GET('v', '1.0');
 const DATA_FILE = GET('dataFile', '');
 const DIFF_FILE = GET('diff', '');
 
+const READ = (id) => `
+  var r = await mtop.request({ api: 'mtop.idle.pc.idleitem.editdetail', v: '1.0', data: { itemId: ${JSON.stringify(id)} }, type: 'GET' });
+  var d = (r && r.data) || {};
+  return JSON.stringify({ ret: r && r.ret, data: d });
+`;
+
 // ── 模式 0：--status 只读开关状态（App 里点完用来核对）
-//    ⚠️ 必须放在 const READ 之后 —— 放前面 + 顶层 return 会让 READ 永远不声明（TDZ 报错，踩过）。
+//    ⚠️ READ 必须声明在本块之前，且本块不能用顶层 return（那样 READ 永远不声明 → TDZ，踩过）。
 if (argv.includes('--status')) {
   (async () => {
     await agent.ready({ stores: [STORE], timeout: 240000 });
@@ -75,11 +81,6 @@ if (!IDS.length) {
 }
 
 const PROF = (() => { try { return storeProfile.load(STORE); } catch (e) { return {}; } })();
-const READ = (id) => `
-  var r = await mtop.request({ api: 'mtop.idle.pc.idleitem.editdetail', v: '1.0', data: { itemId: ${JSON.stringify(id)} }, type: 'GET' });
-  var d = (r && r.data) || {};
-  return JSON.stringify({ ret: r && r.ret, data: d });
-`;
 
 const outDir = path.join(ROOT, '_tmp');
 fs.mkdirSync(outDir, { recursive: true });
@@ -200,3 +201,5 @@ fs.mkdirSync(outDir, { recursive: true });
     console.log('  ' + JSON.stringify(asObj(await agent.mtop(code, { timeout: 180000 }))).slice(0, 300));
   }
 })().catch((e) => { console.log('❌ ' + (e && e.message || e)); process.exit(1); });
+
+}   // end else（非 --status 分支）
