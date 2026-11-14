@@ -277,6 +277,42 @@ async function main() {
         ? '✅ 配模板的9个控件都在（店名/价格/规格/分类/风格/版式/口味/预算/出价）'
         : '❌ 向导缺控件: ' + missWz.join(', ')));
       if (missWz.length) webOk = false;
+
+      // 【第 232 轮加】坏输入的报错必须是中文。
+      //   为什么加：第232 轮实测 /api/action 的各种坏输入都返回
+      //     400 {"error":"缺少参数：city"} / "未知动作" —— 全中文 ✅
+      //   但这是「碰巧写对的」，没人守。哪天改成英文或直接甩堆栈，
+      //   学员点「开始」只会看到天书，而 [6] 原有的断言（health/首页/控件）全都发现不了。
+      //   三条全是400，不会真的起任务，安全。
+      const badCases = [
+        ['publish 缺城市', { kind: 'publish' }],
+        ['未知动作', { kind: '不存在的动作' }],
+        ['wizard 缺店名', { kind: 'wizard' }],
+      ];
+      let apiOk = true;
+      for (const [name, body] of badCases) {
+        try {
+          const r = await fetch('http://127.0.0.1:' + PORT + '/api/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          const txt = await r.text();
+          const eng = /Cannot find module|node:internal|TypeError|at Object\.|stack/i.test(txt);
+          const cn = /缺少参数|未知动作/.test(txt);
+          if (r.status !== 400 || eng || !cn) {
+            apiOk = false;
+            console.log('      ❌ ' + name + ' → HTTP ' + r.status + ' ' + txt.slice(0, 90));
+          }
+        } catch (e) {
+          apiOk = false;
+          console.log('      ❌ ' + name + ' → ' + e.message);
+        }
+      }
+      console.log('      ' + (apiOk
+        ? '✅ 坏输入的报错都是中文（缺少参数 / 未知动作，3 条）'
+        : '❌ 有接口报错不是中文或不是400'));
+      if (!apiOk) webOk = false;
     }
   } catch (e) {
     console.log('      ❌ 起服务失败: ' + e.message);
