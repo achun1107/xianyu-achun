@@ -108,6 +108,32 @@ function info(msg) { console.log('      ·  ' + msg); }
   }
   ok('四道检查全过（' + (checks.checks || []).length + ' 道，' + checks.at.slice(11, 19) + '）');
 
+  // 【第 220 轮加】发之前把管理员手册「发包前手动补两道」也跑了。
+  //   为什么放这：那两道（verify 57 项 / smoke-scripts 26+4）【不写 .checks.json】，
+  //   原来全靠发包的人记得手跑 —— 忘了就发出去了。
+  //   放 publish-package 而不是 build：build 每轮打好几次，加进来要多 90 秒；
+  //   publish 一个版本才一次，多这 90 秒换「不可能漏」值。
+  const { execFileSync: _ex } = require('child_process');
+  const MANUAL = [
+    ['verify-student-view.js', '自检（57 项 / 21 组）', 180000],
+    ['smoke-scripts.js', '学员脚本逐个真跑（26 + 4 专项）', 240000],
+  ];
+  step(1, '发之前补跑「手动两道」');
+  for (const [script, label, timeout] of MANUAL) {
+    const p = path.join(__dirname, script);
+    if (!fs.existsSync(p)) { console.log('      ❌ ' + script + ' 不在'); process.exit(1); }
+    try {
+      _ex(process.execPath, [p], { cwd: path.join(__dirname, '..'), stdio: 'pipe', encoding: 'utf8', timeout });
+      ok(label);
+    } catch (e) {
+      const out = String((e.stdout || '') + (e.stderr || ''));
+      const tail = out.split(/\r?\n/).filter((l) => l.trim()).slice(-6);
+      console.log('      ❌ ' + label + ' 没过，拒绝发布：');
+      tail.forEach((l) => console.log('         ' + l.trim().slice(0, 110)));
+      process.exit(1);
+    }
+  }
+
   // ── ② clone gh-pages ──
   step(2, 'clone gh-pages');
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'publishpkg-'));
