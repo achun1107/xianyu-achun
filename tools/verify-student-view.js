@@ -1289,6 +1289,28 @@ const check = (name, ok, detail) => {
         missMarks.length ? missMarks.slice(0, 3).join(' | ') : '找不到 node / 服务已停止 / 按任意键继续 / 退出码');
     }
 
+    // ⑭之五 install.ps1 的前置检查必须在（第 228–230 轮连着补的三条）
+    //   为什么加：这三条全是「文档写了要求、代码却没执行」补出来的 ——
+    //   Node18+ 门槛（228）、磁盘 <1GB 拦（229）、系统版本警告（230）。
+    //   哪天有人改 install.ps1 把它们删了，⑤ 的运行时断言【抓不到】
+    //   （因为这三条只在「坏机器」上才产生输出），所以这里做静态存在性检查。
+    {
+      const need = [
+        ['$MinNode', '第228轮 Node18+ 门槛'],
+        ['Node 版本太旧', '第228轮 版本太旧的中文提示'],
+        ['$BlockFreeGB', '第229轮 磁盘分级'],
+        ['磁盘空间不够', '第229轮 磁盘拦截的中文提示'],
+        ['Windows 10 / 11', '第230轮 系统版本要求'],
+        ['不是 Windows 10 / 11', '第230轮 系统版本的中文提示'],
+      ];
+      const ip = path.join(achun, 'install.ps1');
+      const it = fs.existsSync(ip) ? fs.readFileSync(ip, 'utf8') : '';
+      const miss5 = it ? need.filter(([s]) => !it.includes(s)).map(([s, w]) => s + '（' + w + '）')
+        : ['install.ps1 不在包里'];
+      check('install.ps1 的前置检查都在（228–230 轮补的三条）', miss5.length === 0,
+        miss5.length ? miss5.slice(0, 3).join(' | ') : need.length + ' 项');
+    }
+
     check('包内 .cmd/.bat/.ps1 的行尾、字符与 BOM', probs.length === 0,
       probs.length ? probs.slice(0, 3).join(' | ') : n + ' 个文件');
   }
