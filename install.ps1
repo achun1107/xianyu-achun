@@ -188,6 +188,34 @@ if (-not $SkipDeps) {
     }
 }
 
+# ── 1c. 磁盘空间（2026-11-14 第 229 轮加）──────────────────────────
+# 为什么加：install-guide 第 0 节写着「磁盘留 3 GB（首次装会下 Chromium 约 1.5 GB）」，
+#   但安装器从来没验过这件事 —— 满盘时 npm install / Chromium 下载会中途炸，
+#   报的是英文 ENOSPC / ENOSPC，学员既看不懂也想不到是磁盘。
+# 分级：<1 GB 直接拦（装必炸），1–3 GB 只警告（可能够，让他自己掂量）。
+$MinFreeGB = 3; $BlockFreeGB = 1
+try {
+    $driveLetter = (Get-Item -LiteralPath $Root).PSDrive.Name
+    $freeGB = [math]::Round((Get-PSDrive -Name $driveLetter -ErrorAction Stop).Free / 1GB, 1)
+    if ($freeGB -lt $BlockFreeGB) {
+        Bad ('磁盘空间不够：' + $driveLetter + ': 只剩 ' + $freeGB + ' GB（至少要 ' + $MinFreeGB + ' GB）')
+        Write-Host ''
+        Write-Host '  为什么会炸：首次安装要下 Chromium（约 1.5 GB）+ 依赖，空间不够会下到一半失败。' -ForegroundColor Yellow
+        Write-Host '  怎么办：'
+        Write-Host ('    1) 打开「此电脑」看 ' + $driveLetter + ': 还剩多少')
+        Write-Host '    2) 清掉回收站 / 下载文件夹里的旧文件，或改解压到别的盘（D: E: 都行）'
+        Write-Host '    3) 重新解压安装包，再双击 install.cmd'
+        Write-Host ''
+        exit 1
+    } elseif ($freeGB -lt $MinFreeGB) {
+        Warn ('磁盘空间偏紧：' + $driveLetter + ': 只剩 ' + $freeGB + ' GB（建议至少 ' + $MinFreeGB + ' GB）')
+        Write-Host '         首次安装要下 Chromium（约 1.5 GB）。够就继续，不够会在下到一半时报错。'
+    } else {
+        Ok ('磁盘空间：' + $driveLetter + ': 剩 ' + $freeGB + ' GB')
+    }
+} catch { }
+
+
 # ── 1b. 代理（2026-11-14 第 157 轮加）─────────────────────────────
 # 为什么加：《发放说明》第一节就要求「装之前先关掉 VPN / 系统代理」，
 #   但安装器从来没验过这件事。有代理时会同时出两个症状，而且都不好懂：
