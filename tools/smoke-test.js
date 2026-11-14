@@ -249,6 +249,22 @@ async function main() {
       const hasCn = /闲鱼|上架|店铺/.test(page);
       console.log('      ' + (page.length > 1000 && hasCn ? '✅ 首页能开（' + page.length + ' 字节，中文正常）' : '❌ 首页不对'));
       if (!(page.length > 1000 && hasCn)) webOk = false;
+
+      // 【第 199 轮加】目标那句话的字面路径在页面上必须存在：
+      //   「一句话输入」框 + 城市/明星 两栏 + 确认发布勾选框 + 引导语。
+      //   这些是学员点「① 发一条新链接」之后真正要交互的元素，
+      //   少一个他就卡住（而 /api/health 和「中文正常」都发现不了）。
+      const need = ['id="pub-oneline"', 'id="pub-city"', 'id="pub-star"', 'id="pub-confirm"'];
+      const missIds = need.filter((s) => !page.includes(s));
+      console.log('      ' + (missIds.length === 0
+        ? '✅ 发链接要的4个控件都在（一句话输入/城市/明星/确认发布）'
+        : '❌ 缺控件: ' + missIds.join(', ')));
+      if (missIds.length) webOk = false;
+
+      // 引导语：第 198 轮真浏览器看到的是「一句话输入 城市 明星 就行」。
+      const hasGuide = /一句话输入/.test(page) && /城市/.test(page) && /明星/.test(page);
+      console.log('      ' + (hasGuide ? '✅ 页面上有「一句话输入 城市 明星」的引导' : '❌ 引导语没了'));
+      if (!hasGuide) webOk = false;
     }
   } catch (e) {
     console.log('      ❌ 起服务失败: ' + e.message);
