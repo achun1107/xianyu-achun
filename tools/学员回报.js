@@ -9,7 +9,9 @@
  *
  * 用法（在 xianyu-achun 目录里）：
  *   node tools\学员回报.js
- *   node tools\学员回报.js --zip=D:\下载\xianyu-install-xxx.zip   （指定安装包位置）
+ *   node tools\学员回报.js --zip="D:\下载\xianyu-install-xxx.zip"   （指定安装包位置）
+ *   ⚠️ 路径里有空格时【一定要加引号】，否则 --zip= 后面只传进去一半（第246 轮实测）。
+ *   --no-save 时不写桌面文件（冒烟测试用）。
  *
  * 原则：【只读】—— 不改任何配置、不跑安装、不发链接。
  */
