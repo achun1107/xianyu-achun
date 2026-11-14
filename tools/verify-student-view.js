@@ -1020,6 +1020,7 @@ const check = (name, ok, detail) => {
       //   `node tools/update.js --apply --from=<地址>`。不在包里的话学员只能走 B
       //   手动四步，而手册把 A 写在最前面。
       'xianyu-achun/tools/update.js',
+    'xianyu-achun/tools/学员回报.js',   // 第242轮：真机验证一键收集（清单步骤10 让学员跑它）
       // 核心库
       'xianyu-achun/lib/crash.js', 'xianyu-achun/lib/env.js',
       'xianyu-achun/lib/store-profile.js', 'xianyu-achun/lib/agent.js',
@@ -1192,6 +1193,8 @@ const check = (name, ok, detail) => {
       'update.js', 'utf8-check.js', 'scrub-secrets.js', 'today.js',
       // staff-ui 自己的
       'staff-ui/server.js', 'staff-ui/start.js',
+      // 【第 242 轮】真机验证一键收集回报（真机清单步骤10 用）
+      '学员回报.js',
       // 【2026-11-13 第 140 轮】staff-ui/server.js 会真的执行这三个（预热 / 开关推广 / 应用改动）
       'ensure-agent.js', 'ad-power.js', 'apply-item.js',
     ]);

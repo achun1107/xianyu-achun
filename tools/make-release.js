@@ -368,6 +368,7 @@ function excluded(rel) {
 const TOOLS_ALLOWED = new Set([
   // 建店 / 配店
   'store-wizard.js', 'store-init.js', 'store-ready.js', 'store-login.js',
+  '学员回报.js',   // 第242轮：真机验证一键收集回报（真机清单步骤10）
   'store-new.js', 'store-list.js', 'store-bulk.js', 'store-audit.js',
   'preset-export.js', 'install-config.js', 'install-tasks.js',
   'dump-store-config.js', 'print-paths.js',
