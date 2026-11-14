@@ -265,6 +265,18 @@ async function main() {
       const hasGuide = /一句话输入/.test(page) && /城市/.test(page) && /明星/.test(page);
       console.log('      ' + (hasGuide ? '✅ 页面上有「一句话输入 城市 明星」的引导' : '❌ 引导语没了'));
       if (!hasGuide) webOk = false;
+
+      // 【第 201 轮加】「配置发布模板」那半段（⑤ 向导）的控件 ——
+      //   目标前半句是「配置好她的发布模板」，smoke [4] 验的是【命令行】向导，
+      //   网页表单少一个输入框学员就配不了，而 /api/health 和 [4] 都发现不了。
+      //   10 个字段里 wz-store 是必填，其余9 个都有默认值（价格50/版式__shoukai…）。
+      const needWz = ['id="wz-store"', 'id="wz-price"', 'id="wz-spec"', 'id="wz-cat"',
+        'id="wz-style"', 'id="wz-tpl"', 'id="wz-tone"', 'id="wz-budget"', 'id="wz-bid"'];
+      const missWz = needWz.filter((s) => !page.includes(s));
+      console.log('      ' + (missWz.length === 0
+        ? '✅ 配模板的9个控件都在（店名/价格/规格/分类/风格/版式/口味/预算/出价）'
+        : '❌ 向导缺控件: ' + missWz.join(', ')));
+      if (missWz.length) webOk = false;
     }
   } catch (e) {
     console.log('      ❌ 起服务失败: ' + e.message);

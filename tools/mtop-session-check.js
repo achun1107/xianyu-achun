@@ -89,6 +89,22 @@ function call(code) {
     process.exit(1);
   }
   const d = typeof j.result === 'string' ? JSON.parse(j.result) : j.result;
+
+  // 【2026-11-14 统一分类】本脚本是其它脚本的"判据源"，所以结论必须由 lib/err-class 出码，
+  //   而不是各脚本自己写一段 if。注意：**退出码仍用历史约定**（0/2/3/1），
+  //   因为 ad-window / ad-watch-stuck 按 SOP §2.9 依赖这两个数字。
+  const { classifyError } = require('../lib/err-class');
+  const cls = (code, extra) => {
+    // 用真实现场字段拼一条判据文本，再交给分类器；确保"码"忠于证据，而不是硬写
+    const bits = [];
+    bits.push('adRet=' + JSON.stringify(d.adRet));
+    if (d.refreshAutoLogin) bits.push('refreshAutoLogin=' + d.refreshAutoLogin);
+    bits.push('登录墙=' + d.loginWall + ' unb非空=' + d.unbNonEmpty + ' _tb_token_=' + d.hasTbToken);
+    if (extra && extra.refreshAutoLogin) bits.push(String(extra.refreshAutoLogin));
+    const text = bits.join(' | ');
+    const r = classifyError(text, { script: 'mtop-session-check', href: d.href, adProbe: (d.adRet && String(d.adRet[0])) || null, ...(extra || {}) });
+    return r;
+  };
   console.log('页面      : ' + d.href);
   console.log('refreshAutoLogin : ' + d.refreshAutoLogin);
   console.log('广告接口  : ' + JSON.stringify(d.adRet) + (d.adCount !== undefined ? '  命中 ' + d.adCount + ' 条' : ''));
@@ -108,6 +124,7 @@ function call(code) {
   //      于是**误报"被限流"并让闸门退避了 10 分钟**，还在文档里写错了判据。
   if (adOk) {
     console.log('✅ 结论：会话正常，广告接口可用（命中 ' + (d.adCount === undefined ? '?' : d.adCount) + ' 条）。');
+    console.log('   [err-class] E0 EMPTY_OK / 实为"正常"，不是取不到（classify: ' + cls('E0').code + '）');
     if (/limit|fatigue/i.test(ra)) {
       console.log('   注：refreshAutoLogin 回了「' + ra + '」—— 那是它自己那条路的限额，');
       console.log('       与广告接口无关，**不要**据此停手。');
@@ -115,17 +132,30 @@ function call(code) {
     process.exit(0);
   }
   if (/limit|fatigue/i.test(ra)) {
+    // 【2026-11-14 统一分类】判定仍按本脚本自己的主次顺序（广告接口为唯一裁判），
+    //   但结论与证据交给 lib/err-class 统一出码；**退出码保持历史约定**（2=疲劳限流，3=掉登录），
+    //   因为 ad-window / ad-watch-stuck 等调用方按 SOP §2.9 依赖这两个数字，改号会连带改一堆脚本。
+    const c3 = cls('E3', { refreshAutoLogin: ra, adRet: d.adRet });
     console.log('🔴 结论：广告接口不通，且 refreshAutoLogin 报限流 → 判为【疲劳限流】。');
+    console.log('   [err-class] ' + c3.code + ' ' + c3.name + ' | 重试=' + c3.retry + ' 停手=' + c3.gated + ' 告警=' + c3.alert + ' | 本脚本退出码沿用 **2**（历史约定，见 SOP §2.9）');
+    console.log('   证据: adRet=' + JSON.stringify(d.adRet) + ' refreshAutoLogin=' + ra);
     console.log('   → 立即停手，不要重试、不要换页面重试。等自然恢复（分钟级到小时级）。');
     console.log('   → 这段时间 ad-watch-stuck / ad-window 也会失败，日志是');
     console.log('     「read failed: 执行失败: ...」—— 别当成脚本坏了去改脚本。');
     process.exit(2);
   }
   if (loggedOut) {
+    const sub = (d.unbNonEmpty === false || d.hasTbToken === false) ? 'incomplete' : (adOk ? null : 'expired');
+    const c4 = cls('E4', { sub, loginWall: d.loginWall, unbNonEmpty: d.unbNonEmpty, hasTbToken: d.hasTbToken, adRet: d.adRet });
     console.log('🔴 结论：广告接口不通 + 有登录墙/cookie 缺失 → 判为【掉登录】。');
+    console.log('   [err-class] ' + c4.code + (c4.sub ? '/' + c4.sub : '') + ' ' + c4.name + ' | 重试=' + c4.retry + ' 告警=' + c4.alert + ' | 本脚本退出码沿用 **3**（历史约定，见 SOP §2.9）');
+    console.log('   证据: 登录墙=' + d.loginWall + ' unb非空=' + d.unbNonEmpty + ' _tb_token_=' + d.hasTbToken + ' tracknick=' + d.hasTracknick + ' adRet=' + JSON.stringify(d.adRet));
     console.log('   → 需要老板在浏览器里重新扫码登录店铺。');
     process.exit(3);
   }
+  const c8 = cls('E8', { loginWall: d.loginWall, unbNonEmpty: d.unbNonEmpty, adRet: d.adRet });
   console.log('⚠️ 结论：广告接口不通，但既不是限流也不像掉登录 —— 去查别的（页面报错见上）。');
+  console.log('   [err-class] ' + c8.code + ' ' + c8.name + ' | 证据: adRet=' + JSON.stringify(d.adRet) + ' loginWall=' + d.loginWall + ' unb非空=' + d.unbNonEmpty);
+  console.log('   → E8 不重试；请把上面三件证据贴给 lead，并补进错误分类表的已知清单。');
   process.exit(1);
 })().catch((e) => { console.log('❌ ' + ((e && e.stack) || e)); process.exit(1); });
