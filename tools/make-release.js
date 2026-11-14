@@ -342,6 +342,11 @@ function excluded(rel) {
   //     · xianyu-商品索引.csv ← staff-ui/server.js L127 真的在读
   //     · config.local.json.example / PACKAGE-README.txt / 交付状态 ← 已知保留
   /^(check-client-decl\.mjs|final-check\.js|fix-live-titles\.js|probe-status-dom\.js|rebuild-publish-baseline\.js|unify-desc\.js|unify-live-desc\.js|verify-gen\.js|shows\.json)$/,
+  // 【第 212 轮】wecom-sheet.js —— 老板往企微智能表格写日报/收指令的工具，
+  //   它要调 ss-call.ps1，而那个 .ps1 被 ⑭ 排了（ALLOWED 里没有）——
+  //   留着 .js 只会让 check-refs 报「指向的脚本不在包里」。
+  //   学员文档一处没提（第 212 轮核过），不在 TOOLS_ALLOWED。
+  /^wecom-sheet\.js$/,
   ];
 
   // ── tools/ 下的 .js 走【白名单】而不是黑名单 ──

@@ -158,13 +158,37 @@ function main() {
       //   OPTIONAL = 调用方明确 try/catch 掉的「可选依赖」，缺了会走降级路径，
       //   不算会崩。目前只有 feishu-alert.js：ad-window.js L100-105把它包在
       //   try 里，缺了就退企微、再退桌面文件（飞书凭据本来就是运行时才有的）。
-      const OPTIONAL = new Set(['tools/feishu-alert.js']);
+      const OPTIONAL = new Set(['tools/feishu-alert.js',
+        // 【第 212 轮】ad-window.js L111 调 wecom-send.ps1 —— 整段包在 try/catch 里，
+        //   缺了只会在日志里记「告警异常（企微 exit -1）」，不崩。而且企微 webhook
+        //   本来就是管理员的，学员机器上配了也发不出去。
+        'wecom-send.ps1',
+        // 【第 212 轮】install-tasks 的7 个监控目标 —— 第165 轮专门处理过：
+        //   它们是【管理员那边】的计划任务，包里本来就不带；install-tasks 会
+        //   逐个 resolvable() 检查、缺的跳过并打中文说明「这不是你装错了」。
+        //   healthcheck 的 start.bat 是【拼给人看的修复提示字符串】，不是真去调。
+        'ad-window-8am.cmd', 'ad-window-11pm.cmd', 'ad-window-guard.cmd',
+        'ad-balance-duty.ps1', 'ad-retry-order.ps1', 'ad-watch-stuck.ps1',
+        'wake-publish-sleep.bat', 'start.bat']);
       for (const m of t.matchAll(/path\.join\([^,]+,\s*['"]tools['"]\s*,\s*['"]([\w.\-]+\.js)['"]/g)) {
         const target = 'tools/' + m[1];
         if (have.has(target)) continue;
         if (OPTIONAL.has(target)) continue;
         if (problems.some((p) => p.file === rel && p.what.includes(target))) continue;
         problems.push({ file: rel, what: target, why: 'path.join 调的子脚本不在包里（拼接写法，上面几条扫不到）' });
+      }
+
+      // ⑤ path.join(ROOT, 'xxx.ps1'/'xxx.cmd'/'xxx.mjs') —— 两参、直接指文件
+      //   【第 212 轮加】第 211 轮复查孤儿时发现：
+      //     wecom-sheet.js → ss-call.ps1    （.ps1 被 ⑭ 排了，.js 却在包里）
+      //   只扫【脚本类扩展名】—— .json/.md/.csv 大多是运行时生成或已知保留，
+      //   全扫会出 35 个误报（第 212 轮第一版就撞了）。
+      for (const m of t.matchAll(/path\.join\([^,]+,\s*['"]([\w\u4e00-\u9fa5][\w\u4e00-\u9fa5.\-]*\.(?:ps1|cmd|bat|mjs))['"]/g)) {
+        const target = m[1];
+        if (have.has(target)) continue;
+        if (OPTIONAL.has(target)) continue;
+        if (problems.some((p) => p.file === rel && p.what.includes(target))) continue;
+        problems.push({ file: rel, what: target, why: 'path.join 指向的脚本不在包里' });
       }
     }
 
