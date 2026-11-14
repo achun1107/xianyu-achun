@@ -152,6 +152,28 @@ if (-not $NodeExe) {
 }
 Ok ('node: ' + $NodeExe + '  (' + (& $NodeExe -v) + ')')
 
+# 【第 228 轮加】文档三处都写「Node.js 18 或更高」（install-guide 第0 节 / 学员安装 / 真机清单），
+#   但这里从没验过 —— 装了 Node 16 的机器会一路跑到 npm install 才炸，而且报的是英文。
+#   学员的第一道坎，应该在这儿就拦住并给出中文指引。
+$nv = ''
+try { $nv = (& $NodeExe -v 2>$null | Select-Object -First 1) } catch { $nv = '' }
+# 门槛和提示里的数字用同一个变量 —— 改门槛时不会漏改文案（第228 轮实测反向验证过）
+$MinNode = 18
+if ($nv -match 'v(\d+)') {
+    $major = [int]$Matches[1]
+    if ($major -lt $MinNode) {
+        Bad ('Node 版本太旧：' + $nv.Trim() + '（需要 v' + $MinNode + ' 或更高）')
+        Write-Host ''
+        Write-Host '  怎么办（3 步）：' -ForegroundColor Yellow
+        Write-Host '    1) 打开 https://nodejs.org/zh-cn → 下载 LTS 版（当前是 v22）'
+        Write-Host '    2) 一路下一步装完（覆盖旧版本即可，不用先卸载）'
+        Write-Host '    3) 【关掉所有命令行窗口】再重新双击 install.cmd'
+        Write-Host '       （不关的话新装的 PATH 不生效，还会看到同样的错）'
+        Write-Host ''
+        exit 1
+    }
+}
+
 $GitExe = $null
 if (-not $SkipDeps) {
     $g = Get-Command git -ErrorAction SilentlyContinue
