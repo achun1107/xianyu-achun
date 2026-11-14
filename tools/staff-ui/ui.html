@@ -446,10 +446,16 @@ async function go(kind) {
   }
 
   const b = body(kind);
-  // ⚠️ 布尔字段（confirm / dry）值为 false 时是【合法输入】，不能当成"没填"
-  const BOOL_FIELDS = ['confirm', 'dry'];
+  // ⚠️ 布尔字段（confirm / dry）值为 false 时是【合法输入】，不能当成"没填"。
+  // ⚠️【第 200 轮修】base 也一样：它的默认项「跟随店铺配置（推荐）」value 就是空串，
+  //   服务端 `if (p.base)` 也只在有值时才加 --base —— 空是【合法的「跟随档案」语义】。
+  //   不加进这个名单的话，学员什么都不改直接点「开始」，会被拦下：
+  //       请先填完整：base
+  //   而他根本没看见哪个框「没填」（下拉框明明显示着「跟随店铺配置（推荐）」）。
+  //   实测（第 200 轮真浏览器）：填好城市明星点开始 → 卡在这句。
+  const EMPTY_OK = ['confirm', 'dry', 'base'];
   for (const [k, v] of Object.entries(b)) {
-    if (k === 'kind' || BOOL_FIELDS.includes(k)) continue;
+    if (k === 'kind' || EMPTY_OK.includes(k)) continue;
     if (!v) { log.textContent = '请先填完整：' + k; setStatus(''); return; }
   }
 
