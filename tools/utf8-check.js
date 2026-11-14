@@ -20,7 +20,13 @@ const out = require('../lib/out');
 const { ROOT } = require('../lib/env');
 
 const FIX = process.argv.includes('--fix');
-const NEED_BOM = ['.ps1', '.bat', '.cmd'];
+// 【第 248 轮】NEED_BOM 原来有 '.cmd'，但本文件 L10 的说明只写了 .ps1/.bat —— 自相矛盾。
+//   更要命的是：--fix 会【真的给 GBK 的 .cmd 加 UTF-8 BOM】，
+//   实测把 启动.cmd / 体检.cmd / run-node.cmd 三个入口全改坏了
+//   （BOM 在 GBK 里解成「锘?」，@echo off 不再生效 → 每行命令都被回显）。
+//   而 .cmd 是【故意用 GBK】的（第 153/176 轮：chcp 936 + GBK 存，UTF-8 的 chcp 之后再写中文会乱码）。
+//   所以：.cmd 不要求 BOM，也【不】当「坏 UTF-8」报 —— 见下面 GBK 分支。
+const NEED_BOM = ['.ps1', '.bat'];
 const TEXT = ['.js', '.mjs', '.json', '.md', '.txt', '.html', '.yml', '.yaml', '.csv', '.xml', '.ps1', '.bat', '.cmd', '.ndjson'];
 const SKIP_DIRS = new Set(['node_modules', '.git', '_archive', 'desktop-profile-backup', 'blobs', 'Cache', 'Code Cache']);
 
@@ -61,7 +67,18 @@ for (const f of files) {
   // 1) 能不能当 UTF-8 读
   const text = body.toString('utf8');
   if (text.includes('\uFFFD')) {
-    report.badUtf8.push(rel);
+    // 【第 248 轮】.cmd 是【故意用 GBK 存】的（chcp 936 + GBK），当 UTF-8 读必然出替换字符。
+    //   这不是坏文件，报出来只会让人去 --fix 它 —— 而 --fix 一修就把它改成 UTF-8+BOM，
+    //   GBK 下 @echo off 前面多出「锘?」，入口脚本当场坏掉（第248 轮实测：启动.cmd/体检.cmd/run-node.cmd 三个全中）。
+    //   所以 .cmd/.bat 只要【能当 GBK 干净解出中文】就放行；GBK 也解不干净才是真坏。
+    if (ext === '.cmd' || ext === '.bat') {
+      try {
+        const gbk = new TextDecoder('gbk').decode(body);
+        if (gbk.includes('\uFFFD')) report.badUtf8.push(rel);
+      } catch (e) { report.badUtf8.push(rel); }
+    } else {
+      report.badUtf8.push(rel);
+    }
   }
 
   // 2) BOM 要求
@@ -94,7 +111,8 @@ for (const f of files) {
   //       ① 把中文搬进 .js（推荐，.cmd 只留 ASCII 引导代码）
   //       ② 第 2 行加 chcp 65001（此时文件字节真按 UTF-8 解码，才是安全的）
   if (ext === '.cmd' && !isAscii) {
-    if (!/^\s*chcp\s+65001/m.test(text)) report.cmdNonAscii.push(rel);
+  // 【第 248 轮】两种 chcp 都算「有意为之」：65001=UTF-8 存、936=GBK 存（第176 轮的入口设计）。
+  if (!/^\s*chcp\s+(65001|936)/m.test(text)) report.cmdNonAscii.push(rel);
   }
 
   // 3) 行尾混用

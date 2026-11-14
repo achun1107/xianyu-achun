@@ -1269,7 +1269,7 @@ const check = (name, ok, detail) => {
         let isUtf8 = true;
         try {
           txt = new TextDecoder('utf-8').decode(buf);
-          if (txt.includes('�')) { isUtf8 = false; txt = new TextDecoder('gbk').decode(buf); }
+          if (txt.includes('\uFFFD')) { isUtf8 = false; txt = new TextDecoder('gbk').decode(buf); }
         } catch (e) { txt = buf.toString('utf8'); }
         const bad = [];
         if (isCmd) for (const ch of txt) {
@@ -1318,7 +1318,7 @@ const check = (name, ok, detail) => {
         let txt = '';
         try {
           txt = new TextDecoder('utf-8').decode(buf);
-          if (txt.includes('�')) txt = new TextDecoder('gbk').decode(buf);
+          if (txt.includes('\uFFFD')) txt = new TextDecoder('gbk').decode(buf);
         } catch (e) { txt = buf.toString('latin1'); }
         if (!txt.includes(marker)) missMarks.push(rel + ' 缺「' + marker + '」（' + why + '）');
       }

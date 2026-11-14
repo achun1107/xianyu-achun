@@ -1,4 +1,4 @@
-﻿/**
+/**
  * tools/cat-audit.js —— 只读：给在售清单逐条查真实分类，输出「代购 vs 演出票代拍」审计表
  * 用法: node tools/cat-audit.js
  */
