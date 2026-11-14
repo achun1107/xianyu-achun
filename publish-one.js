@@ -361,6 +361,20 @@ const SHOUKAI = LIB['⑨ 刘宪华首开样式（紫块白字+红字三行·居�
 (async () => {
   fs.mkdirSync(OUTDIR, { recursive: true });
 
+  // 【第 235 轮·提前到最前面】文案模板库必须先有 ——
+  //   原来这个检查在 section 3（图都出完了才读），文件不在时学员白等 10 秒
+  //   然后看到英文 ENOENT（第235 轮实测）。现在开跑就查，省时间也早点给中文提示。
+  //   下面 section 3 读的时候仍带 try/catch（防 TOCTOU 和别处调用）。
+  {
+    const _tf = path.join(os.homedir(), '.xianyu-templates.json');
+    if (!fs.existsSync(_tf)) {
+      console.log('❌ 文案模板库还没生成：' + _tf);
+      console.log('   没有它就不知道该用哪套文案，所以发链接会停在这一步。');
+      console.log('   怎么办：重跑一次 install.cmd（它会生成这个文件），或找管理员要一份 .xianyu-templates.json。');
+      process.exit(1);
+    }
+  }
+
   // ── 1. 主图模板：从【店铺档案】的 主图.templates 池里随机抽；KUN_MAIN_TPL 指定时用指定的 ──
   // 【2026-10-07 改】原来这里是一个硬编码的 TPLS 数组，装着两个店的全部版式，
   //   于是 ① hope 店会随机抽到代拍店的版式 ② 在服务端版式库里加了新版式但忘了在这里加一行，
@@ -653,7 +667,21 @@ const SHOUKAI = LIB['⑨ 刘宪华首开样式（紫块白字+红字三行·居�
   console.log('图片: ' + path.basename(imgFile) + '  ' + Math.round(jpg.length / 1024) + ' KB  ' + meta.width + 'x' + meta.height);
 
   // ── 3. 文案：随机一个 titlePattern + 模板正文 ──
-  const T = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.xianyu-templates.json'), 'utf8'));
+  // 【第 235 轮修】这里原来是裸 readFileSync —— 文件不在就抛英文 ENOENT，
+  //   而且是在【图都出完了】之后才炸，白等一轮还看不懂。
+  //   实测（USERPROFILE 指向空目录）：
+  //     ❌ ENOENT: no such file or directory, open '...\.xianyu-templates.json'
+  //   同时 install.ps1 那句 warn 还写着「不影响发布」——两边对不上，都改。
+  const TPL_FILE = path.join(os.homedir(), '.xianyu-templates.json');
+  let T;
+  try {
+    T = JSON.parse(fs.readFileSync(TPL_FILE, 'utf8'));
+  } catch (e) {
+    console.log('❌ 文案模板库还没生成：' + TPL_FILE);
+    console.log('   没有它就不知道该用哪套文案，所以发链接会停在这一步。');
+    console.log('   怎么办：重跑一次 install.cmd（它会生成这个文件），或找管理员要一份 .xianyu-templates.json。');
+    process.exit(1);
+  }
   // 【2026-10-07 改】按【店铺】分模板池，池子来自【店铺档案】的 文案.templateIds。
   // 背景：一个 json 两个店共用，原来是全库随机抽 —— 一旦加了票务店的文案，
   //   代拍店会抽到票务话术、票务店会抽到代拍话术。

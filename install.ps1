@@ -512,10 +512,13 @@ else {
             & $NodeExe $mk --store=$studentStore 2>&1 | ForEach-Object { Write-Host ('         ' + $_) }
             if (Test-Path $tplUser) { Ok ('已生成: ' + $tplUser) }
             else {
-                # 2026-11-13 改：原来写「发布时会缺文案模板」—— 听起来像发不出去，学员会慌。
-                #   实际有兜底：storeTemplates 里没有这个店时用【全部模板】照样能发。
-                Warn '文案模板库没生成成功 —— 不影响发布（会自动用全部模板）'
-                Write-Host '         只是「按店铺挑模板」这个功能用不了，所有店共用同一套。'
+                # 2026-11-14 第 235 轮改：原来写「不影响发布（会自动用全部模板）」——
+                #   那句说的是【storeTemplates 里没有这个店】的兜底（publish-one L665），
+                #   但这个 warn 触发的条件是【文件根本不存在】—— 那条路 publish-one
+                #   原来是裸 readFileSync，直接抛英文 ENOENT（第235 轮实测）。
+                #   两个场景被混成一句了，现在说真话。
+                Warn '文案模板库没生成成功 —— 这一步【会】影响发链接'
+                Write-Host '         发链接时会停在「文案模板库还没生成」（中文提示，已修好不会甩英文）。'
                 Write-Host '         想修：把这条发给管理员，或者重跑一次 install.cmd。'
             }
         }
