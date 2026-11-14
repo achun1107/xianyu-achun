@@ -817,6 +817,31 @@ const check = (name, ok, detail) => {
       check('onclick 里的函数都有定义', missingFns.length === 0,
         missingFns.length ? '未定义: ' + missingFns.join(', ') : onclickFns.size + ' 个事件处理函数');
     }
+
+    // ⑦ 「一句话输入」的解析 —— 目标里那句【输入城市明星】的字面路径
+    //   为什么加（第 191 轮）：目标是「输入:城市明星，就能上架」。
+    //   这条路径全在 ui.html 的 body('publish') 里：
+    //     · 先按 空格/逗号/顿号/斜杠 切，≥2 段 → city=第一段，star=其余拼起来
+    //     · 只有一段 → 拿 CITIES 列表前缀匹配（连写「广州王嘉尔」也认）
+    //     · 都切不出来 → star 为空，前端 go() 会拦下并显示「请先填完整：star」
+    //   实测（第 191 轮）10 个用例全过（4 种分隔符 + 连写 + 多词 + 边界）。
+    //   这里静态核三件事：入口在、城市表够大、切分规则没被改坏。
+    {
+      const ui = fs.readFileSync(path.join(achun, 'tools', 'staff-ui', 'ui.html'), 'utf8');
+      const probs7 = [];
+      if (!/id="pub-oneline"/.test(ui)) probs7.push('找不到「一句话输入」框 id=pub-oneline');
+      const cm = ui.match(/const CITIES = \[([\s\S]*?)\];/);
+      const nCity = cm ? [...cm[1].matchAll(/'([^']+)'/g)].length : 0;
+      if (nCity < 30) probs7.push('CITIES 只有 ' + nCity + ' 个城市（连写切分靠它，至少要 30）');
+      // 用 includes 而不是正则 —— 源码里那行本身带 / 和 \，转义两层容易写错（第 191 轮踩过）
+      if (!ui.includes('one.split(/[') || !ui.includes('\\s,，、\\/]+/)')) {
+        probs7.push('一句话的分隔符切分规则被改了');
+      }
+      if (!ui.includes('one.startsWith(c)')) probs7.push('连写靠城市名前缀切的逻辑没了');
+      if (!/请先填完整：/.test(ui)) probs7.push('没填全时的中文提示没了');
+      check('一句话输入能解析（分隔符 + 连写 + 城市表）', probs7.length === 0,
+        probs7.length ? probs7.slice(0, 3).join(' | ') : nCity + ' 个城市 / 4 种分隔符 / 连写可切');
+    }
   }
 
   // ── ⑬ 学员独立入口文件 ──
