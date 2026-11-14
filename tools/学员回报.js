@@ -83,6 +83,20 @@ for (const f of needFiles) {
   if (!ok) structOk = false;
   P('  ' + (ok ? '✅' : '❌') + ' ' + f);
 }
+if (!structOk) {
+  // 【第244 轮】在开发机上跑会全是 ❌（那边 xianyu-achun 的父目录不是包根），
+  //   不解释一句管理员会以为包坏了。
+  const bareCheckout = fs.existsSync(path.join(PKG, '.git')) || fs.existsSync(path.join(ROOT, '.git'));
+  if (bareCheckout && !fs.existsSync(path.join(PKG, 'xianyu-playwright-service'))) {
+    P('');
+    P('  ⚠️ 这看着像【开发机上的代码目录】，不是解压出来的学员包。');
+    P('     学员包的判断：和 xianyu-achun 并排还有 xianyu-playwright-service / xianyu-monitor，');
+    P('     以及包根的 install.cmd。要是你在开发机上跑，这节的 ❌ 是正常的。');
+  } else {
+    P('');
+    P('  ⚠️ 结构不全 —— 解压没解对，或者只拷了一部分。对照清单步骤2 重新解压。');
+  }
+}
 P('');
 P('');
 
