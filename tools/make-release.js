@@ -683,6 +683,27 @@ function pack(repoDir, name, secrets) {
 
   console.log('\n════ 可以发的包 ════');
   results.forEach((r) => console.log('  ' + r.zipName + '   ' + (r.bytes / 1048576).toFixed(1) + ' MB   ' + r.files + ' 文件'));
+  // 【第 221 轮加】自动清旧包：只留最近 10 个。
+  //   为什么不手动：第220 轮查发现 D:\xianyu-release 已经积到 132 个 zip（约 120 MB），
+  //   全是每轮打包留下的。不清理会一直涨，而且 publish-package 每次都要把
+  //   130+ 个文件名打印一遍（第220 轮实测输出里全是「旧: …」）。
+  try {
+    const KEEP = 10;
+    const zips = fs.readdirSync(OUT)
+      .filter((f) => /^xianyu-install-.*\.zip$/.test(f))
+      .map((f) => ({ f, t: fs.statSync(path.join(OUT, f)).mtimeMs }))
+      .sort((a, b) => b.t - a.t);
+    const drop = zips.slice(KEEP);
+    if (drop.length) {
+      for (const d of drop) {
+        for (const suf of ['', '.sha256', '.checks.json']) {
+          try { fs.rmSync(path.join(OUT, d.f + suf), { force: true }); } catch (e) { /* 忽略 */ }
+        }
+      }
+      console.log('  清了 ' + drop.length + ' 个旧包（保留最近 ' + KEEP + ' 个）');
+    }
+  } catch (e) { console.log('  · 旧包清理跳过: ' + e.message); }
+
   console.log('  sha256 都在同目录的 .sha256 里 —— 发的时候一起带上，让学员那边校验。');
   console.log('\n⚠️ 这个包【不含】.git，所以学员拿不到含密钥的历史；');
   console.log('   但也因此不能用 git 更新 —— 更新走 node tools/update.js --from=<新包URL> 或重新发包覆盖。');
