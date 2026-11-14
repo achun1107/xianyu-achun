@@ -1326,6 +1326,29 @@ const check = (name, ok, detail) => {
         missMarks.length ? missMarks.slice(0, 3).join(' | ') : '找不到 node / 服务已停止 / 按任意键继续 / 退出码');
     }
 
+    // ⑭之四点五 utf8-check 不能去"修" .cmd（第 248 轮踩的坑）
+    //   为什么加：错误速查教学生「改完 .ps1 跑一次 utf8-check.js --fix」，
+    //   而那个工具的 NEED_BOM 原来含 '.cmd' —— 一跑就把 GBK 的三个入口
+    //   （启动/体检/run-node）改成 UTF-8+BOM，GBK 下 @echo off 前面多出「锘?」，
+    //   双击入口当场坏。第248 轮实测踩到，修完立刻加这条守住。
+    {
+      const uj = path.join(achun, 'tools', 'utf8-check.js');
+      const t = fs.existsSync(uj) ? fs.readFileSync(uj, 'utf8') : '';
+      const bad = [];
+      if (!t) bad.push('utf8-check.js 不在包里');
+      else {
+        const m = t.match(/const\s+NEED_BOM\s*=\s*\[([^\]]*)\]/);
+        if (!m) bad.push('找不到 NEED_BOM 定义');
+        else if (/[.'"]cmd[.'"]/.test(m[1])) bad.push('NEED_BOM 里还有 .cmd（会把 GBK 入口改成 UTF-8+BOM）');
+        // chcp 必须同时认 936 和 65001（两种合法设计）
+        //   ⚠️ 只查字面量 `(65001|936)` —— 原来写的 /chcp\s+\(…\)/ 里 \s+ 被当成
+        //   「一个或多个空白」，而源码里那是【反斜杠+s 加号】四个字符，永远匹配不上（第249 轮踩）。
+        if (!/\(65001\|936\)/.test(t)) bad.push('chcp 检查只认一种码页');
+      }
+      check('utf8-check 不会去改 .cmd（第248 轮的坑）', bad.length === 0,
+        bad.length ? bad.join(' | ') : 'NEED_BOM 不含 .cmd + chcp 认 936/65001');
+    }
+
     // ⑭之五 install.ps1 的前置检查必须在（第 228–230 轮连着补的三条）
     //   为什么加：这三条全是「文档写了要求、代码却没执行」补出来的 ——
     //   Node18+ 门槛（228）、磁盘 <1GB 拦（229）、系统版本警告（230）。
