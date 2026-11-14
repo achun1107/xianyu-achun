@@ -138,6 +138,21 @@ function main() {
         must: [/账号列表里没有「冒烟测试-不存在的店」/],
         mustNot: [/\{"ok":/],
       },
+      {
+        // 第 216 轮：install-tasks 无参 = 预演（不注册任何任务，安全）。
+        //   第165 轮修过它的报错：解释器型任务会注册到不存在的文件，
+        //   提示改成「这是正常的，不是你装错了」。这条守着那个文案。
+        args: ['tools/install-tasks.js'],
+        must: [/脚本不在这个包里/, /不是你装错了/],
+        mustNot: [/is not recognized|Cannot find module/],
+      },
+      {
+        // 第 151 轮：update.js --status 在没有 .git 的学员包里
+        //   原来甩英文 `fatal: not a git repository`，现在是中文说明。
+        args: ['tools/update.js', '--status'],
+        must: [/没法用「按 git 更新」/],
+        mustNot: [/fatal: not a git repository|not a git repository/],
+      },
     ];
     let argBad = 0;
     for (const c of WITH_ARGS) {
@@ -153,10 +168,10 @@ function main() {
       const miss = c.must.filter((re) => !re.test(out));
       const leak = c.mustNot.filter((re) => re.test(out));
       if (!miss.length && !leak.length) {
-        console.log('  ✅ ' + c.args[0] + ' ' + c.args[1] + '  → 中文提示到位');
+        console.log('  ✅ ' + c.args[0] + (c.args[1] ? ' ' + c.args[1] : '（无参）') + '  → 中文提示到位');
       } else {
         argBad++;
-        console.log('  ❌ ' + c.args[0] + ' ' + c.args[1]);
+        console.log('  ❌ ' + c.args[0] + (c.args[1] ? ' ' + c.args[1] : '（无参）'));
         miss.forEach((re) => console.log('       缺少期望文案: ' + re));
         leak.forEach((re) => console.log('       泄漏了原文: ' + re + '  → ' + (out.match(re) || [''])[0].slice(0, 80)));
       }
