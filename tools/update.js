@@ -247,7 +247,9 @@ function restore(bak, files) {
 
 // ── zip 源 ────────────────────────────────────────────────────────────────
 function doZipUpdate(src, wantSha, label) {
-  const zipUrl = src, sha = wantSha, fromLabel = label || src;
+  const zipUrl = src;
+  let sha = wantSha;   // 【第 225 轮】const → let：没给 --sha256 时会试着从 <包地址>.sha256 取
+  const fromLabel = label || src;
   const tmp = path.join(os.tmpdir(), 'xy-update-' + Date.now());
   fs.mkdirSync(tmp, { recursive: true });
   const zip = path.join(tmp, 'code.zip');
@@ -267,6 +269,21 @@ function doZipUpdate(src, wantSha, label) {
     go(u,0);`;
   try { execFileSync(process.execPath, ['-e', DL, zipUrl, zip, AUTH_KEY], { stdio: 'inherit', timeout: 300000 }); }
   catch (e) { die(1, '下载失败：' + e.message); }
+
+  // 【第 225 轮加】没给 --sha256 时，试着取「包地址 + .sha256」。
+  //   发布流程本来就把 .sha256 放在 zip 旁边（make-release 写、publish-package 推，
+  //   公网 xianyu-latest.zip.sha256 一直在），但学员用 --from=<地址> 时从来不去拿 ——
+  //   白白跳过校验，包下坏了/被改过都发现不了。
+  //   拿不到就保持原样（下面那句「跳过校验」的提示）。
+  if (!sha && /^https?:\/\//i.test(zipUrl) && /\.zip$/i.test(zipUrl)) {
+    try {
+      const shaFile = path.join(tmp, 'code.zip.sha256');
+      execFileSync(process.execPath, ['-e', DL, zipUrl + '.sha256', shaFile, AUTH_KEY],
+        { stdio: 'ignore', timeout: 60000 });
+      const m = fs.readFileSync(shaFile, 'utf8').match(/[0-9a-f]{64}/i);
+      if (m) { sha = m[0]; log('② 取到 ' + zipUrl.split('/').pop() + '.sha256，下面会校验'); }
+    } catch (e) { /* 拿不到就按原样跳过 */ }
+  }
 
   if (sha) {
     const got = crypto.createHash('sha256').update(fs.readFileSync(zip)).digest('hex');
