@@ -948,6 +948,10 @@ const check = (name, ok, detail) => {
       'xianyu-achun/tools/list-onsale.js', 'xianyu-achun/tools/ad-review.js',
       'xianyu-achun/tools/ad-status.js', 'xianyu-achun/tools/install-tasks.js',
       'xianyu-achun/tools/ad-plan-create.js', 'xianyu-achun/tools/store-new.js',
+      // 【第 203 轮】更新脚本 —— 手册 1.8 A 方案（推荐路径）就是它：
+      //   `node tools/update.js --apply --from=<地址>`。不在包里的话学员只能走 B
+      //   手动四步，而手册把 A 写在最前面。
+      'xianyu-achun/tools/update.js',
       // 核心库
       'xianyu-achun/lib/crash.js', 'xianyu-achun/lib/env.js',
       'xianyu-achun/lib/store-profile.js', 'xianyu-achun/lib/agent.js',
