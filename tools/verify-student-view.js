@@ -921,6 +921,17 @@ const check = (name, ok, detail) => {
       check('前端发的字段覆盖服务端必填', probs9.length === 0,
         probs9.length ? probs9.slice(0, 3).join(' | ') : Object.keys(needed).length + ' 个动作全对上');
     }
+    // 【第 205 轮试过又撤掉】想在这儿补一个「报告里的回归项数也要对」的检查
+    //   （回归127 只守自检项数，报告里的「回归 32/32」实际是43，没人管）。
+    //   做法是 execFileSync 跑 tools/regression-check.js 数 ✅ —— 但
+    //   `regression-check.js`【不在包里】（TOOLS_ALLOWED 没它），而
+    //   `verify-student-view.js`【在包里】，于是 check-refs 立刻报：
+    //       tools/verify-student-view.js → tools/regression-check.js 不在包里
+    //   而且真在学员机上跑也会因为缺文件而误报失败。
+    //   静态数也不行：regression 用 ok()/bad() 辅助函数 + 循环，
+    //   源码里 ok(/bad( 只有 31 处，实际输出 43 项，差 12 超过 ±8 容差。
+    //   → 这个检查只能由【跑一次 regression】来验，那就放在发包的人身上，
+    //     不放进每轮都跑的 verify。
   }
 
   // ── ⑬ 学员独立入口文件 ──

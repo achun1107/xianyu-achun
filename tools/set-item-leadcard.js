@@ -41,6 +41,9 @@ const argv = process.argv.slice(2);
 const GET = (k, d) => { const a = argv.find((x) => x.startsWith('--' + k + '=')); return a ? a.slice(k.length + 3) : d; };
 const GO = argv.includes('--go');
 const SNAPSHOT = argv.includes('--snapshot');
+// 【2026-11-14 加】--patchFile=<json文件>：PowerShell 传 --patch='{"a":"b"}' 会把内层双引号
+//   弄丢（native 参数引用的老坑，SOP 里早写了「复杂参数用临时 JSON 文件，唯一稳的」）。
+const PATCH_FILE = GET('patchFile', '');
 
 const STORE = GET('store', '') || ENV_STORE || '好易美代拍';
 const IDS = String(GET('ids', '')).split(',').map((s) => s.trim()).filter(Boolean);
@@ -49,6 +52,22 @@ const API = GET('api', '');
 const V = GET('v', '1.0');
 const DATA_FILE = GET('dataFile', '');
 const DIFF_FILE = GET('diff', '');
+
+// ── 模式 0：--status 只读开关状态（App 里点完用来核对）
+//    ⚠️ 必须放在 const READ 之后 —— 放前面 + 顶层 return 会让 READ 永远不声明（TDZ 报错，踩过）。
+if (argv.includes('--status')) {
+  (async () => {
+    await agent.ready({ stores: [STORE], timeout: 240000 });
+    console.log('留资卡开关（editdetail.leadCard，"1"=已开通，无字段=未开通）');
+    for (const id of IDS) {
+      const r = asObj(await agent.mtop(READ(id), { timeout: 120000 }));
+      const d = r.data || {};
+      const v = d.leadCard;
+      const on = v !== undefined && String(v) === '1';
+      console.log('  ' + (on ? '✅已开通' : '❌未开通') + '  ' + id + '  ' + String((d.itemTextDTO || {}).title || '').slice(0, 34));
+    }
+  })().catch((e) => { console.log('❌ ' + (e && e.message || e)); process.exit(1); });
+} else {
 
 if (!IDS.length) {
   console.log('用法: node tools/set-item-leadcard.js --ids=<id,id> [--snapshot] | [--diff=<快照.json>] | [--patch=<json>|--api=.. --dataFile=..] [--go]');
@@ -108,8 +127,9 @@ fs.mkdirSync(outDir, { recursive: true });
   }
 
   // ── 模式 3：批量写 ──
-  if (!PATCH_RAW && !API) { console.log('❌ 要给 --patch=<json> 或 --api=<接口名> --dataFile=<json>'); process.exit(2); }
-  const patch = PATCH_RAW ? JSON.parse(PATCH_RAW) : null;
+  if (!PATCH_RAW && !PATCH_FILE && !API) { console.log('❌ 要给 --patch=<json> / --patchFile=<文件> 或 --api=<接口名> --dataFile=<json>'); process.exit(2); }
+  const patch = PATCH_RAW ? JSON.parse(PATCH_RAW)
+    : (PATCH_FILE ? JSON.parse(fs.readFileSync(path.resolve(ROOT, PATCH_FILE), 'utf8')) : null);
   const apiData = DATA_FILE ? JSON.parse(fs.readFileSync(path.resolve(ROOT, DATA_FILE), 'utf8')) : null;
 
   for (const id of IDS) {
@@ -122,7 +142,7 @@ fs.mkdirSync(outDir, { recursive: true });
     const bak = path.join(bakDir, id + '-leadcard-' + Date.now() + '.json');
     fs.writeFileSync(bak, JSON.stringify(d, null, 2), 'utf8');
 
-    if (PATCH_RAW) {
+    if (patch) {
       // 字段补丁：把 patch 直接盖进 publish 那套 payload，再调 idleitem.edit
       const imgs = (d.imageInfoDOList || []).map((x) => ({
         extraInfo: x.extraInfo || { isH: 'false', isT: 'false', raw: 'false' }, isQrCode: !!x.isQrCode, url: x.url,
