@@ -1079,6 +1079,40 @@ const check = (name, ok, detail) => {
       probs.length ? probs.slice(0, 3).join(' | ') : '保留名单 5 项 + 登录态/方案文件未跟踪');
   }
 
+  // ⑬之四 安装配置不覆盖学员已填的值（配置手册 1.4 的承诺）
+  //   为什么加（第 236 轮）：手册写着「它永远不会动你的配置」「不覆盖已有非空配置」，
+  //   但 install-config.js --derive --apply 会不会真把学员手填的 apiKey/_note 冲掉，
+  //   没人守。第236 轮实测过（带 port/apiKey/machine._note 的配置跑完全在），
+  //   这里把它固化成检查：把 install-config.js + lib/ 拷到临时目录，
+  //   写一份带自定义值的 config.local.json，跑 --derive --apply，再逐项核。
+  console.log('\n⑬之四 安装配置不覆盖已有值（配置手册 1.4 的承诺）');
+  {
+    const probs4 = [];
+    try {
+      const fx = fs.mkdtempSync(path.join(os.tmpdir(), 'xy-icfg-'));
+      fs.mkdirSync(path.join(fx, 'tools'), { recursive: true });
+      fs.cpSync(path.join(achun, 'lib'), path.join(fx, 'lib'), { recursive: true });
+      fs.copyFileSync(path.join(achun, 'tools', 'install-config.js'), path.join(fx, 'tools', 'install-config.js'));
+      fs.writeFileSync(path.join(fx, 'config.local.json'),
+        JSON.stringify({ port: 18083, service: { apiKey: 'MY_KEY_XYZ' }, _note: '学员手填的' }));
+      const r = require('child_process').spawnSync(process.execPath,
+        ['tools/install-config.js', '--derive', '--apply'],
+        { cwd: fx, encoding: 'utf8', timeout: 60000 });
+      if (r.status !== 0) {
+        probs4.push('install-config 退出码 ' + r.status + '：' + String(r.stderr || r.stdout || '').split('\n')[0]);
+      } else {
+        const after = fs.readFileSync(path.join(fx, 'config.local.json'), 'utf8');
+        if (!after.includes('MY_KEY_XYZ')) probs4.push('service.apiKey 被冲掉了');
+        if (!after.includes('学员手填的')) probs4.push('_note 被冲掉了');
+        if (!/"port"\s*:\s*18083/.test(after)) probs4.push('port 被冲掉了');
+        if (!after.includes('"paths"')) probs4.push('paths 没推导出来');
+      }
+      fs.rmSync(fx, { recursive: true, force: true });
+    } catch (e) { probs4.push('跑 install-config 出错: ' + e.message); }
+    check('安装配置不覆盖学员已填的值', probs4.length === 0,
+      probs4.length ? probs4.slice(0, 3).join(' | ') : 'port/apiKey/_note 全保住，paths 正常推导');
+  }
+
   console.log('\n⑭ 包里没有老板的脚本');
   {
     // 这几个是学员真会用/会被链式调用的
