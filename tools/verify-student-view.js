@@ -327,6 +327,9 @@ const check = (name, ok, detail) => {
         n++;
         const which = m[1].toLowerCase();
         const flag = m[2];
+        // 占位符不算真参数 —— 第 171 轮踩过：管理员手册第七节【描述这条检查本身】时
+        //   写了「`install.cmd -Xxx` / `install.ps1 -Xxx` 也算」，结果被自己查出来了。
+        if (/^(X{2,}|Flag|YYY|ZZZ|foo|bar|param|你的参数)$/i.test(flag.replace(/^-+/, ''))) continue;
         if (which === 'install.cmd') {
           const cp = path.join(root, 'install.cmd');
           if (!fs.existsSync(cp)) { probs.push(rel + ': 包根 install.cmd 不在'); continue; }
@@ -380,6 +383,54 @@ const check = (name, ok, detail) => {
     }
     check('9 份文档代码块里的 --参数脚本都认', probs2.length === 0,
       probs2.length ? [...new Set(probs2)].slice(0, 3).join(' | ') : n2 + ' 条命令');
+  }
+
+  // ⑦之三 学员文档里的 first-publish 示例【不能用具体城市+明星】
+  //   为什么加（第 171-173 轮）：示例写的是【会过期的数据】。
+  //   实测：上海 付航 / 杭州 周杰伦 / 杭州 那英 / 上海 周杰伦 —— 大麦上全都没有场次，
+  //   而 first-publish 查不到就停在第 2 步（「大麦有X但没Y」），学员照敲必然失败。
+  //   publish-one 有大麦海报兜底、不受影响；first-publish（网页那条路）没有。
+  //   所以规则：学员文档里 first-publish 的第 2、3 个参数必须是占位符。
+  {
+    const PLACEHOLDER = new Set(['<城市>', '<明星>', '城市', '明星',
+      '<你的店铺名>', '店铺名', '测试店', '冒烟测试店', '冒烟配发店']);
+    // 这个列表和上面⑦之二 的 DOCS_ALL 是同一份 —— 但那是在它自己的块里声明的，
+    // 出了块就没了。这里再列一次（同步改，别只改一处）。
+    const DOCS3 = [
+      'install-guide.html', '真机首装验证清单.md', '发放说明-给学员.md',
+      '管理员手册-分发包维护.md', '学员安装-给学员DSH.md', '学员常见错误速查.md',
+      '学员配置手册.md', '先看这个-五步上手.html', '给学员的一页说明.md',
+    ];
+    const probs3 = [];
+    let n3 = 0;
+    for (const rel of DOCS3) {
+      const p = path.join(achun, rel);
+      if (!fs.existsSync(p)) continue;
+      let t;
+      try { t = fs.readFileSync(p, 'utf8'); } catch (e) { continue; }
+      const blocks = p.endsWith('.html')
+        ? [...t.matchAll(/<pre><code>([\s\S]*?)<\/code><\/pre>/g)].map((x) => x[1])
+        : [...t.matchAll(/```[a-z]*\r?\n([\s\S]*?)```/g)].map((x) => x[1]);
+      for (const b of blocks) {
+        for (const raw of b.split(/\r?\n/)) {
+          const line = raw.trim();
+          // 必须是真命令（以 node 开头）—— 否则散文里提一句 first-publish.js
+          // 也会被当成示例（第 174 轮第一版就误报了速查里的注释行）。
+          if (!/^node\s/.test(line) || !/first-publish\.js/.test(line)) continue;
+          // 抽出 first-publish.js 后面的前两个参数（跳过 flag）
+          const args = [...line.matchAll(/first-publish\.js\s+(?:--[\w-]+=\S+\s+)*(\S+)\s+(\S+)/g)];
+          for (const m of args) {
+            n3++;
+            const bad = [m[1], m[2]].filter((a) =>
+              /[\u4e00-\u9fff]/.test(a)          // 含中文
+              && !PLACEHOLDER.has(a));           // 且不是占位符
+            if (bad.length) probs3.push(rel + ': first-publish 用了具体示例 ' + bad.join(' '));
+          }
+        }
+      }
+    }
+    check('学员文档里 first-publish 的示例是占位符', probs3.length === 0,
+      probs3.length ? [...new Set(probs3)].slice(0, 3).join(' | ') : n3 + ' 处');
   }
 
     // ⑤ 学员文档里点名的文件，包里必须真的有
@@ -800,6 +851,95 @@ const check = (name, ok, detail) => {
   //   实测：包里曾带着「暂停发布.cmd」「ad-balance-duty.ps1」「wecom-send.ps1」这些东西，
   //   学员误点「暂停发布.cmd」= 自动发布整个停掉，而且这些脚本里写死的都是 D:\DSH\achun。
   //   现在把包里的 .cmd/.bat/.ps1 全列出来，只允许白名单里的存在。
+  // ⑬之二 【必须在包里】的清单 —— 防「排除规则排多了」
+  //   为什么加（第 182 轮）：到现在已经排掉 943 个文件（25 批规则）。
+  //   排除是黑名单，写错一条 regex 就会把学员要用的东西排掉，
+  //   而且【语法上完全合法、跑起来才发现】。
+  //   这份清单是【人工筛过的关键路径】，每加一条排除规则之前先跑这个。
+  console.log('\n⑬之二 必须在包里的关键文件');
+  {
+    const MUST = [
+      // 包根
+      'install.cmd', 'install-guide.html', '先看这个-五步上手.html',
+      // xianyu-achun 入口与核心
+      'xianyu-achun/install.ps1', 'xianyu-achun/run-node.cmd', 'xianyu-achun/体检.cmd',
+      'xianyu-achun/config.local.json.example', 'xianyu-achun/service.local.json.example',
+      'xianyu-achun/PACKAGE-README.txt', 'xianyu-achun/publish-one.js',
+      // 学员文档
+      'xianyu-achun/学员配置手册.md', 'xianyu-achun/发放说明-给学员.md',
+      'xianyu-achun/真机首装验证清单.md', 'xianyu-achun/学员常见错误速查.md',
+      'xianyu-achun/给学员的一页说明.md', 'xianyu-achun/学员安装-给学员DSH.md',
+      // 模板
+      'xianyu-achun/stores/_template.json', 'xianyu-achun/publish-groups/_template.json',
+      // 网页入口
+      'xianyu-achun/tools/staff-ui/启动.cmd', 'xianyu-achun/tools/staff-ui/server.js',
+      'xianyu-achun/tools/staff-ui/ui.html',
+      // 学员工具
+      'xianyu-achun/tools/store-wizard.js', 'xianyu-achun/tools/healthcheck.js',
+      'xianyu-achun/tools/store-ready.js', 'xianyu-achun/tools/store-login.js',
+      'xianyu-achun/tools/first-publish.js', 'xianyu-achun/tools/verify-published.js',
+      'xianyu-achun/tools/list-onsale.js', 'xianyu-achun/tools/ad-review.js',
+      'xianyu-achun/tools/ad-status.js', 'xianyu-achun/tools/install-tasks.js',
+      'xianyu-achun/tools/ad-plan-create.js', 'xianyu-achun/tools/store-new.js',
+      // 核心库
+      'xianyu-achun/lib/crash.js', 'xianyu-achun/lib/env.js',
+      'xianyu-achun/lib/store-profile.js', 'xianyu-achun/lib/agent.js',
+      'xianyu-achun/lib/title.js', 'xianyu-achun/lib/http.js',
+      'xianyu-achun/lib/mtop.js', 'xianyu-achun/lib/museav.js',
+      // 服务仓
+      'xianyu-playwright-service/package.json', 'xianyu-playwright-service/package-lock.json',
+      'xianyu-playwright-service/start.bat', 'xianyu-playwright-service/server.js',
+      'xianyu-monitor/native_host.bat', 'xianyu-monitor/一键安装.bat',
+    ];
+    const miss = MUST.filter((f) => !fs.existsSync(path.join(root, f)));
+    check('必须在包里的关键文件都在', miss.length === 0,
+      miss.length ? miss.slice(0, 4).join(' | ') : MUST.length + ' 个');
+  }
+
+  // ⑬之三 更新安全：手册 1.8 A 方案的四个承诺，静态核一遍
+  //   为什么加（第 188 轮）：A 方案说 `update.js --from` 「只换代码、四样数据自动保住」。
+  //   这四条是【手册写给学员的承诺】，一旦 update.js 的 KEEP_PREFIX 改动、
+  //   或某个数据文件被 git 跟踪了，承诺就失效 —— 而学员只有在【更新那一次】才发现。
+  //   实测（第 187 轮）过一遍要 30+ 秒，放不进每轮；改成静态核这几条关键条件。
+  console.log('\n⑬之三 更新安全（手册 1.8 A 方案的承诺）');
+  {
+    const probs = [];
+    const upPath = path.join(achun, 'tools', 'update.js');
+    if (!fs.existsSync(upPath)) {
+      probs.push('tools/update.js 不在包里');
+    } else {
+      const src = fs.readFileSync(upPath, 'utf8');
+      const m = src.match(/const KEEP_PREFIX = \[([\s\S]*?)\n\];/);
+      const keep = m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : [];
+      // ① 保留名单必须含这些
+      const need = ['stores/', 'config.local.json', 'publish-assets/', 'publish-out/',
+        'playwright-service/service.local.json'];
+      for (const n of need) {
+        if (!keep.includes(n)) probs.push('KEEP_PREFIX 缺 ' + n + '（手册承诺会保住它）');
+      }
+      // ② KEEP_EXCEPT 必须只放行模板（整目录保留 + 模板跟着更新）
+      if (!/KEEP_EXCEPT\s*=\s*\[\s*'stores\/_template\.json'/.test(src)) {
+        probs.push('KEEP_EXCEPT 不再是 stores/_template.json（模板该跟着更新）');
+      }
+    }
+    // ③ 登录态不能被 git 跟踪（跟踪了就会进更新清单 → 被覆盖）
+    try {
+      const tracked = execFileSync('git', ['-C', path.join(achun, '..'), 'ls-files', 'browser-profiles'],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      if (tracked) probs.push('browser-profiles 被 git 跟踪了（更新会覆盖登录态）');
+    } catch (e) { /* 包里没 .git 是正常的（学员包不带） */ }
+    // ④ 学员的方案文件不该被跟踪（只有 _template.json 能进清单）
+    try {
+      const pg = execFileSync('git', ['-C', path.join(achun, '..'), 'ls-files', 'publish-groups'],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().split(/\r?\n/).filter(Boolean);
+      const bad = pg.filter((f) => !/_template\.json$/.test(f));
+      if (bad.length) probs.push('publish-groups 里被跟踪的非模板文件：' + bad.slice(0, 2).join(', '));
+    } catch (e) { /* 同上 */ }
+
+    check('更新会保住学员数据（KEEP_PREFIX + 未跟踪）', probs.length === 0,
+      probs.length ? probs.slice(0, 3).join(' | ') : '保留名单 5 项 + 登录态/方案文件未跟踪');
+  }
+
   console.log('\n⑭ 包里没有老板的脚本');
   {
     // 这几个是学员真会用/会被链式调用的
@@ -906,6 +1046,85 @@ const check = (name, ok, detail) => {
   //   语法对不等于能加载 —— require 链上任何一环缺文件、循环依赖、ESM/CJS 混用，
   //   都会在运行时抛错，而语法检查看不出来。
   //   这一组在包内目录里真跑一次 require，验的是"加载得起来"。
+  // ⑭之三 .cmd/.bat 的编码与行尾
+  //   为什么加（第 176 轮）：把三个 .cmd 的英文换成中文时，连踩两个坑，
+  //   都是【文件本身能过语法、跑起来才炸】的：
+  //     ① 行尾不纯（1 个 CRLF / 32 个 LF）→ cmd 解析多字节时在字符中间切行，
+  //        切出来的碎片被当成命令跑：'住你的问题…' 不是内部或外部命令。
+  //        （体检.cmd 头部注释里就写着这个坑"坑过我们一整晚"，我还是踩了）
+  //     ② 往 GBK 文件里写了 GBK 编不了的字符（❌ ⚠️ emoji）→ 变成 '?'，
+  //        学员看到 "标 ? 的行"。
+  //   这两条都查得出来，且必须在【文件层面】查 —— 跑起来才发现已经晚了。
+  console.log('\n⑭之三 .cmd/.bat 的行尾与字符');
+  {
+    const probs = [];
+    let n = 0;
+    (function rec(d, dep) {
+      if (dep > 8) return;
+      for (const name of fs.readdirSync(d)) {
+        if (['node_modules', '.git'].includes(name)) continue;
+        const p = path.join(d, name);
+        let st; try { st = fs.statSync(p); } catch (e) { continue; }
+        if (st.isDirectory()) { rec(p, dep + 1); continue; }
+        if (!/\.(cmd|bat|ps1)$/i.test(name)) continue;
+        n++;
+        const rel = path.relative(root, p).replace(/\\/g, '/');
+        const buf = fs.readFileSync(p);
+        const isCmd = /\.(cmd|bat)$/i.test(name);
+
+        // ① 行尾必须纯 CRLF（只对 .cmd/.bat；PowerShell 认 LF）
+        if (isCmd) {
+          let crlf = 0, lf = 0;
+          for (let i = 0; i < buf.length; i++) {
+            if (buf[i] === 10) { if (i > 0 && buf[i - 1] === 13) crlf++; else lf++; }
+          }
+          if (lf > 0) probs.push(rel + ': ' + lf + ' 个 LF-only 行尾（应全为 CRLF，否则 cmd 会切错行）');
+        }
+
+        // ② GBK 编不了的字符（emoji / 特殊符号）
+        //    ⚠️ 只查 .cmd/.bat —— .ps1 是 UTF-8 带 BOM，PowerShell 认 emoji，
+        //    第 178 轮第一版把 install.ps1 的 ⚠️❌ 误报了。
+        //    ⚠️ 编码挑法（第 177 轮踩过两版）：
+        //      · 不能用「文件里有没有 chcp 65001」判断 —— 体检.cmd 的【注释】里就提到
+        //        chcp 65001，而启动.cmd 有真的 chcp 65001 命令、文件却是 GBK（中文在它前面）。
+        //      · 正确做法：先按 UTF-8 解，解出 U+FFFD 说明不是 UTF-8，再按 GBK 解。
+        //        （install.cmd 是 UTF-8 no BOM，第 153 轮定的；体检/启动 是 GBK）
+        let txt = '';
+        let isUtf8 = true;
+        try {
+          txt = new TextDecoder('utf-8').decode(buf);
+          if (txt.includes('�')) { isUtf8 = false; txt = new TextDecoder('gbk').decode(buf); }
+        } catch (e) { txt = buf.toString('utf8'); }
+        const bad = [];
+        if (isCmd) for (const ch of txt) {
+          const cp = ch.codePointAt(0);
+          if (cp === 0xFFFD) { bad.push('U+FFFD'); break; }
+          if ((cp >= 0x1F000 && cp <= 0x1FAFF)   // emoji 区
+            || cp === 0x274C || cp === 0x26A0     // ❌ ⚠
+            || (cp >= 0xFE00 && cp <= 0xFE0F)) {  // 变体选择符
+            bad.push('U+' + cp.toString(16).toUpperCase());
+          }
+        }
+        if (bad.length) probs.push(rel + ': 含 GBK 编不了的字符 ' + [...new Set(bad)].slice(0, 3).join(' '));
+
+        // ③ .ps1：有中文就必须带 UTF-8 BOM
+        //    PowerShell 5.1 没有 BOM 时按 ANSI（中文系统=GBK）解码 → UTF-8 中文全成乱码。
+        //    这个坑本会话踩过 5 次（edit 工具会把 BOM 剥掉），第 178 轮固化成检查。
+        if (/\.ps1$/i.test(name)) {
+          const hasBom = buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF;
+          if (!hasBom) {
+            let ptxt = '';
+            try { ptxt = new TextDecoder('utf-8').decode(buf); } catch (e) { /* ignore */ }
+            const hasCjk = /[\u4e00-\u9fff]/.test(ptxt);
+            if (hasCjk) probs.push(rel + ': .ps1 有中文但没有 UTF-8 BOM（PowerShell 5.1 下会乱码）');
+          }
+        }
+      }
+    })(root, 0);
+    check('包内 .cmd/.bat/.ps1 的行尾、字符与 BOM', probs.length === 0,
+      probs.length ? probs.slice(0, 3).join(' | ') : n + ' 个文件');
+  }
+
   console.log('\n⑮ 核心模块能 require');
   {
     const MODS = ['./lib/env', './lib/http', './lib/agent', './lib/store-profile', './lib/user-id', './lib/museav'];

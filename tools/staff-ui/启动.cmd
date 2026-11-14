@@ -21,5 +21,7 @@ chcp 65001 >nul
 node tools\staff-ui\server.js
 
 echo.
-echo   Server stopped. Press any key to close.
+chcp 936 >nul
+echo.
+echo   服务已停止，按任意键关闭。
 pause >nul

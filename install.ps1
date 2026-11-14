@@ -529,7 +529,10 @@ Write-Host '══════════ 剩下必须人工做的三件事 ═
   Write-Host ('       node tools\store-ready.js "' + $N + '"')
   Write-Host ('       node tools\store-login.js "' + $N + '" --wait=15')
   Write-Host '  ② 出一张主图看看（只出图，不发布）'
-  Write-Host ('       $env:XY_STORE="' + $N + '"; node publish-one.js 杭州 那英 首开 --dry')
+  # 【第 172 轮】原来这里印的是「杭州 那英」—— 实测那对城市+明星【大麦上没有场次】，
+  #   学员照敲会停在「大麦有那英的场次，但没有杭州的」，以为出故障了。
+  #   改成占位符（和《先看这个-五步上手》一致），让他填自己确定在售的那场。
+  Write-Host ('       $env:XY_STORE="' + $N + '"; node publish-one.js <城市> <明星> <首开/二开> --dry')
   Write-Host ('  ③ 副图（把图丢进 publish-assets\' + $N + '\副图\）')
 Write-Host ''
 Write-Host '  开新店：  node tools\store-new.js --list-accounts'

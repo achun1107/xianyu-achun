@@ -607,7 +607,10 @@ const SHOUKAI = LIB['⑨ 刘宪华首开样式（紫块白字+红字三行·居�
     // 【2026-11-13 第 144 轮改；第 162 轮统一到 requireSvc】
     //   这里原来直接 require，没装依赖时抛英文 Cannot find module。
     //   第 162 轮发现 sharp 的四处也一样裸着，于是一并收进 requireSvc()。
-    const chromium = requireSvc('playwright', '出图能出，但「把文字叠到图上」这一步做不了');
+    // 【2026-11-14 修】requireSvc 返回的是**模块**，playwright 的模块形状是 { chromium, firefox, webkit, ... }；
+      // 原来写成 const chromium = requireSvc('playwright') → chromium 其实是模块本身，.launch 不存在，
+      // 于是报 chromium.launch is not a function。改成取 .chromium，业务逻辑一行未动。
+      const chromium = requireSvc('playwright', '出图能出，但「把文字叠到图上」这一步做不了').chromium;
     const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     await page.setContent('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>');
@@ -681,8 +684,16 @@ const SHOUKAI = LIB['⑨ 刘宪华首开样式（紫块白字+红字三行·居�
   }
   const cand = (FORCE_TPL != null && POOL.find(function (x) { return Number(x.id) === FORCE_TPL; }))
     || POOL[Math.floor(Math.random() * POOL.length)];
-  const titleRes = fitTitle.detail(cand.titlePattern.replace(/\{明星\}/g, STAR).replace(/\{城市\}/g, CITY)
-    .replace(/\{场次类型\}/g, SESSION).replace(/\{活动类型\}/g, EVENT));
+  // 【2026-11-14 加】KUN_TITLE 直接给标题（集合链接/万能链接专用）。
+  //   为什么需要：模板6 是【固定标题】，一个店只能发一条 —— 第二条集合链接再用它就是标题重复
+  //   （10-07 有前科：标题成对重复导致一条没进在售，疑似被判重）。
+  //   传 KUN_TITLE='【必中代拍】全平台…' 走同一个 fitTitle 收口（30 字硬上限 + 补位），
+  //   正文仍从指定模板取。给了 KUN_TITLE 就不再套模板的 {城市}{明星} 占位符。
+  const FORCE_TITLE = process.env.KUN_TITLE || '';
+  const titleRes = FORCE_TITLE
+    ? fitTitle.detail(FORCE_TITLE)
+    : fitTitle.detail(cand.titlePattern.replace(/\{明星\}/g, STAR).replace(/\{城市\}/g, CITY)
+      .replace(/\{场次类型\}/g, SESSION).replace(/\{活动类型\}/g, EVENT));
   const title = titleRes.text;
   const descBody = cand.descPattern;
   const fullDesc = title + '\n\n' + descBody;

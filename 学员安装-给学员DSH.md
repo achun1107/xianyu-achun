@@ -218,7 +218,7 @@ node tools\selftest-lib.js        # 公共库自检
 | 能力 | 命令 |
 |---|---|
 | 看这家店有哪些链接 | `node tools\list-onsale.js`（加关键词筛：`node tools\list-onsale.js 许嵩 王力宏`） |
-| 出一张主图看看 | `$env:XY_STORE="店铺名"; node publish-one.js 杭州 那英 首开 --dry` |
+| 出一张主图看看 | `$env:XY_STORE="店铺名"; node publish-one.js <城市> <明星> <首开/二开> --dry`（填一个**大麦上正在卖**的场次，否则会停在「大麦有X但没Y」） |
 | 发一条链接 | `node tools\publish-group.js <方案文件>`（**先加 `--plan` 预演**） |
 | 看推广计划 | `node tools\ad-review.js` / `node tools\ad-status.js` |
 | 下架一条链接 | `node do-offshelf.js <itemId>`（**只点「下架」，永不点「删除」**） |

@@ -298,6 +298,41 @@ function excluded(rel) {
   //     ③ 有内部信息吗   —— 有：文件头写着输出到 D:\DSH\achun\主图筛选-…
   //   它唯一的调用方 gen-redtext-cover.js 第 138 轮已经排掉，包里没人引用它。
   /^make-covers\.js$/,
+  // 【2026-11-14 加·第二十三批，第 179 轮】根层的【没人读的测试/结果残留】。
+  //   怎么发现的：把包解开列根层文件，85 个里有 29 个【没有任何文档、也没有任何代码提到】。
+  //   其中这些是明确的垃圾：
+  //     · {var              ← 文件名本身就是坏的（模板变量写漏到磁盘上），内容是一次
+  //                           eval-on-store 调试的 AI 回复，还带着老板店名
+  //     · *-result.json / *-task.xml / verify2~4.json / plan7test.json
+  //                          ← 某次跑完留下的结果快照，没有脚本会读
+  //     · pager.json(36B) / table.json(43B) / dangling-fix.json / find-ad-link.json
+  //                          ← 空壳或一次性调试残留
+  //     · GitLab注册流程-给潘春兴.md ← 内部文档，写着具体人名
+  //   判据是「三问」：学员会打开吗（不会）/ 打开会困惑吗（会，一堆看不懂的 JSON）/
+  //   有内部信息吗（有，老板店名 + 具体人名）。
+  //   ⚠️ config.local.json.example 不在此列 —— 学员要复制它。
+  /^(\{var|pager\.json|table\.json|verify[234]\.json|plan7test\.json|dangling-fix\.json|find-ad-link\.json|publish-\d+-[\w-]+-result\.json|publish-4groups-result\.json|publish-4groups-task\.xml|publish-batch-result\.json|wechat-messages\.json|GitLab注册流程-给潘春兴\.md)$/,
+  // 【第 180 轮·第二十四批】上一批的延续：把「引用者本身也不在包里」的算清楚之后，
+  //   又清出 12 个。判据是【引用者在不在包】：
+  //     · im-keywords.json  ← 只有 im-today.js 读，而 im-today.js 不在包里
+  //     · xy-scan-page.js   ← 只有 xy-scan.js 调，而 xy-scan.js 不在包里
+  //     · 员工入口/文案模板定稿/闲鱼筛选规则 ← 只被「交付说明」「上架方案」这类
+  //       内部文档提到，那几份自己也不在包里
+  //     · bid-types/clickables/new-plan/order-fields.json ← 全仓没有任何 .js 按名字读
+  //   ⚠️ 明确保留（别跟着删）：
+  //     · PACKAGE-README.txt        ← make-release 自己要写它
+  //     · config.local.json.example ← 学员要复制
+  //     · 交付清单.md / 交付状态-*.md ← 【regression-check 会读】（L131 / L341）
+  /^(im-keywords\.json|xy-scan-page\.js|代拍文案润色\.md|企微授权-点这里\.html|文案模板-改动记录-20260926\.md|员工入口-staff-使用说明\.md|文案模板-定稿\.md|闲鱼商品筛选规则-定稿\.md|bid-types\.json|clickables\.json|new-plan\.json|order-fields\.json)$/,
+  // 【第 181 轮·第二十五批】另外两个仓的孤儿 —— excluded() 对三个仓【共用】（pack L505），
+  //   所以这里写相对路径就能排到 playwright-service / monitor 里去。
+  //   怎么发现的：把包解开，对每个仓的文件名在【全包文本】里数出现次数，
+  //   只出现 1 次（=只有自己）就是没人提的。
+  //   ⚠️ 保留：package-lock.json（npm install 要用）、两份 PACKAGE-README.txt（make-release 要写）
+  //   ⚠️ 保留：批量发布模板.xlsx / xianyu-asset-spec.json（人工打开的模板和规格，没有代码引用是正常的）
+  /^(damai-plan-list\.js|damai-recon\.js|probe-damai\.js)$/,                     // playwright-service 的大麦探测
+  /^(ad_ledger\.py|CODE_REVIEW\.md|操作记录-[\d-]+\.md|闲鱼项目合体研究-完整报告\.md)$/,
+  /^console-tools\/(capture-sku|dump-items|find-item-api|tmp-today)\.js$/,
   ];
 
   // ── tools/ 下的 .js 走【白名单】而不是黑名单 ──
