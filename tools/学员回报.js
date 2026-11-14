@@ -65,7 +65,7 @@ try {
       P('  ⚠️ 旁边没有 .sha256 文件，没法比（把 .sha256 放到 zip 同目录再跑一次）');
     }
   }
-} catch (e) { P('  ❌ 校验出错：' + e.message); }
+} catch (e) { P('  ❌ 校验出错：读不到安装包（路径不对或没下全）'); }
 P('');
 
 // ── 2. 目录结构（对应清单步骤2）────────────────────────────────
@@ -112,7 +112,11 @@ try {
   const a = (sv.localAccounts || [])[0] || {};
   P('  店铺名：' + (a.name || '（没填）') + '   id：' + (a.id ? a.id.slice(0, 8) + '…' : '（没填）'));
   if (a.id && !/^[0-9a-f-]{36}$/i.test(a.id)) P('    ⚠️ id 看着不像 UUID（应该是36 位带横杠）');
-} catch (e) { P('  ⚠️ 读不到 service.local.json：' + e.message); }
+} catch (e) {
+  // 别把 e.message 原样甩出来 —— 里面常带 ENOENT / Cannot find module 这种英文，
+  // 学员看不懂（第243 轮冒烟就是被这个 ENOENT 拦下的）。中文说清就够了。
+  P('  ⚠️ 读不到 service.local.json（文件不存在或格式不对）');
+}
 P('');
 
 // ── 4. 跑一遍预演安装（只读，等价于清单步骤4）─────────────────
@@ -162,7 +166,7 @@ try {
     if (!fs2.length) P('  （目录是空的）');
     fs2.forEach((x) => P('    ' + new Date(x.t).toLocaleString('zh-CN') + '  ' + x.f));
   }
-} catch (e) { P('  ⚠️ ' + e.message); }
+} catch (e) { P('  ⚠️ 读不到 publish-out（目录不存在或没权限）'); }
 P('');
 
 // ── 收尾：这几段脚本拿不到 ────────────────────────────────────
@@ -176,9 +180,15 @@ P('');
 P('把【上面整段】+【这几条】一起发给管理员就行。');
 
 // 存一份到桌面，方便直接拖进聊天
-try {
-  const desktop = path.join(os.homedir(), 'Desktop', '学员机回报.txt');
-  fs.writeFileSync(desktop, out.join('\r\n'), 'utf8');
+//   --no-save / XY_REPORT_NO_SAVE=1 时不写（冒烟测试用，别覆盖学员桌面上已有的那份）
+if (!process.argv.includes('--no-save') && process.env.XY_REPORT_NO_SAVE !== '1') {
+  try {
+    const desktop = path.join(os.homedir(), 'Desktop', '学员机回报.txt');
+    fs.writeFileSync(desktop, out.join('\r\n'), 'utf8');
+    console.log('');
+    console.log('  已存一份到桌面：' + desktop);
+  } catch (e) { /* 桌面不可写就算了 */ }
+} else {
   console.log('');
-  console.log('  已存一份到桌面：' + desktop);
-} catch (e) { /* 桌面不可写就算了 */ }
+  console.log('  （--no-save：这次不写桌面文件）');
+}

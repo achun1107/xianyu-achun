@@ -153,6 +153,14 @@ function main() {
         must: [/没法用「按 git 更新」/],
         mustNot: [/fatal: not a git repository|not a git repository/],
       },
+      {
+        // 第 243 轮：学员回报.js 是清单步骤10 让学员跑的收集器，
+        //   它会跑预演安装 + 体检（约 11 秒），--no-save 是别写桌面
+        //   （冒烟在开发机上跑，会覆盖桌面上已有的那份）。
+        args: ['tools/学员回报.js', '--no-save'],
+        must: [/【1】安装包校验/, /【5】一键体检/, /不写桌面文件/],
+        mustNot: [/Cannot find module|node:internal|ENOENT/],
+      },
     ];
     let argBad = 0;
     for (const c of WITH_ARGS) {
