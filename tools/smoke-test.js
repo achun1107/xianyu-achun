@@ -257,6 +257,32 @@ async function main() {
   }
   if (!webOk) wProblems.push('staff-ui 起不来或首页不对');
 
+  // ── [7] first-publish 的优雅停止 ──
+  //   为什么加（第 195 轮）：[5] 验的是 publish-one（命令行，有兜底），
+  //   而【网页那条路】跑的是 first-publish —— 它查不到场次会停在第 2 步。
+  //   要验的是：停得【优雅且全中文】，不甩英文堆栈。
+  //   （实测：广州 王嘉尔 大麦上没场次 → 正好用来验这条停止路径）
+  //   ⚠️ 不要设 XY_STORE：设了会先走 store-ready，而冒烟店在 8093 里没有账号 →
+  //      停在第 1 步「店铺没就绪」，根本走不到大麦那步（第 195 轮第一版就这么栽的）。
+  //      不设就是默认店，它会先打一行「[还没配置]」警告再继续到第 2 步 —— 正是要验的路径。
+  console.log('\n  [7] first-publish 查不到场次时的停止（网页那条路）');
+  let f7 = '';
+  try {
+    f7 = execFileSync('node', [path.join('tools', 'first-publish.js'), '广州', '王嘉尔', '首开', '--event=演唱会'],
+      { cwd: achun, encoding: 'utf8', timeout: 180000, stdio: 'pipe' });
+  } catch (e) {
+    f7 = String((e.stdout || '') + (e.stderr || ''));
+  }
+  const f7Stopped = /已停止|没有「/.test(f7);
+  const f7Chinese = /大麦有「/.test(f7);
+  const f7English = /Cannot find module|node:internal\/|\n\s+at\s+\w/.test(f7);
+  console.log('      ' + (f7Stopped ? '✅' : '❌') + ' 停在大麦那步（没场次是预期）');
+  console.log('      ' + (f7Chinese ? '✅' : '❌') + ' 提示是中文（大麦有「X」但没有「Y」）');
+  console.log('      ' + (f7English ? '❌ 有英文堆栈' : '✅ 没有英文堆栈'));
+  if (!f7Stopped) wProblems.push('first-publish 没停在大麦那步');
+  if (!f7Chinese) wProblems.push('first-publish 的停止提示不是中文');
+  if (f7English) wProblems.push('first-publish 甩了英文堆栈');
+
   if (!KEEP) {
     try { fs.rmSync(tmp, { recursive: true, force: true }); }
     catch (e) { console.log('  · 临时目录没清掉（句柄还占着），不影响结果: ' + e.message); }
