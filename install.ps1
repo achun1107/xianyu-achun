@@ -117,6 +117,28 @@ if ($DryRun) { Write-Host '  模式   : DryRun（只预演，不改任何东西�
 # ── 1. 前置：node / git ──────────────────────────────────────────
 Head '前置检查'
 
+# ── 1a. 系统版本（2026-11-14 第 230 轮加）─────────────────────────
+# 为什么加：install-guide 第 0 节、学员安装、真机清单三处都写「Windows 10 / 11」，
+#   但安装器从没验过。Win7/8 上 playwright 新版本根本跑不起来，
+#   学员会装到一半才撞上，而且报的多半是英文。
+# 只警告不拦截：版本号有时被兼容模式带偏（6.2 不一定是真的 Win8），
+#   说清楚让他自己判断，别替他决定装不装。
+$osVer = $null
+try {
+    $cv = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction Stop
+    if ($cv.CurrentMajorVersionNumber) { $osVer = [int]$cv.CurrentMajorVersionNumber }
+} catch { }
+if (-not $osVer) { try { $osVer = [System.Environment]::OSVersion.Version.Major } catch { $osVer = $null } }
+if ($osVer -and $osVer -lt 10) {
+    # 注意：Win10 和 Win11 的注册表主版本号都是 10，Win7/8 才是 6.x。
+    # 所以这里读到 <10 基本可以断定不是 Win10+；直接说「不是 Win10/11」
+    # 比打印「Windows 6」清楚。
+    Warn ('这台机器不是 Windows 10 / 11（主版本号 ' + $osVer + '）')
+    Write-Host '         playwright + Chromium 需要 Win10 以上；老系统上会装到一半失败。'
+    Write-Host '         先确认一下：设置 → 系统 → 关于 里看「Windows 规格」。'
+    Write-Host '         （确认过确实是 Win10+ 就继续；真是老系统就换台机器装。）'
+}
+
 # node：和 run-node.cmd 同一套四级回退，别写死版本号（自动升级会改名）
 $NodeExe = $null
 $vd = if ($env:XY_NODE_VERSIONS) { $env:XY_NODE_VERSIONS } else { Join-Path $env:USERPROFILE '.workbuddy\binaries\node\versions' }
