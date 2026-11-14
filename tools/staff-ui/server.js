@@ -476,7 +476,11 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { id: t.id, kind: t.kind, status: t.status, log: t.log, out: t.out || '', result: t.result || null });
   }
 
-  json(res, 404, { error: 'not found' });
+  // 【第 233 轮】兜底 404 原来是英文 `not found` ——
+  //   学员不会直接打这些地址，但【万一】前端哪天拼错路径，
+  //   他看到的就是 `{"error":"not found"}`，完全看不懂发生了什么。
+  //   全站唯一还在的英文报错，顺手改掉。
+  json(res, 404, { error: '接口不存在：' + p });
 });
 
 server.listen(PORT, '127.0.0.1', () => {

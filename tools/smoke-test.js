@@ -309,9 +309,30 @@ async function main() {
           console.log('      ❌ ' + name + ' → ' + e.message);
         }
       }
+      // 【第 233 轮】任务查询的坏路径 —— 兜底 404 原来是英文 `not found`，
+      //   同一轮改成了「接口不存在：<路径>」。这两条守着它。
+      for (const [name, u] of [
+        ['任务不存在', '/api/task/99999'],
+        ['非法任务id', '/api/task/abc'],
+        ['兜底404', '/api/nope'],
+      ]) {
+        try {
+          const r = await fetch('http://127.0.0.1:' + PORT + u);
+          const txt = await r.text();
+          const eng = /Cannot find module|node:internal|TypeError|stack/i.test(txt) || txt.includes('"not found"');
+          const cn = /任务不存在|接口不存在/.test(txt);
+          if (r.status !== 404 || eng || !cn) {
+            apiOk = false;
+            console.log('      ❌ ' + name + ' → HTTP ' + r.status + ' ' + txt.slice(0, 90));
+          }
+        } catch (e) {
+          apiOk = false;
+          console.log('      ❌ ' + name + ' → ' + e.message);
+        }
+      }
       console.log('      ' + (apiOk
-        ? '✅ 坏输入的报错都是中文（缺少参数 / 未知动作，3 条）'
-        : '❌ 有接口报错不是中文或不是400'));
+        ? '✅ 坏输入的报错都是中文（缺少参数 / 未知动作 / 任务不存在 / 接口不存在，6 条）'
+        : '❌ 有接口报错不是中文或不是预期状态码'));
       if (!apiOk) webOk = false;
     }
   } catch (e) {
