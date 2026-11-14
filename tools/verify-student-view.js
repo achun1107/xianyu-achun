@@ -594,6 +594,25 @@ const check = (name, ok, detail) => {
       check('六份文档里的 node 命令都能跑', uniqBad.length === 0,
         uniqBad.length ? uniqBad.slice(0, 3).join(' | ') : cmdCount + ' 条命令');
 
+      // ⑦之五 文档里写的「N 条文档命令」要等于上面数出来的 cmdCount
+      //   为什么加（第 214 轮）：第213 轮发现文档写 129、实际 131 ——
+      //   加检查/改文档时没人同步这个数。它不是「检查项数」（那两个已有人守），
+      //   是【命令条数】，和 cmdCount 是同一个来源，这里直接比。
+      {
+        const probs5 = [];
+        for (const rel of ['交付状态-2026-11-13.md', '管理员手册-分发包维护.md']) {
+          const p = path.join(achun, rel);
+          if (!fs.existsSync(p)) { probs5.push('找不到 ' + rel); continue; }
+          const rep = fs.readFileSync(p, 'utf8');
+          const m = rep.match(/(\d+)\s*条文档命令|（\*\*(\d+) 条命令\*\*）/);
+          const declared = m ? Number(m[1] || m[2]) : null;
+          if (declared === null) probs5.push(rel + ' 里没写命令条数');
+          else if (declared !== cmdCount) probs5.push(rel + ' 写 ' + declared + '、实际 ' + cmdCount);
+        }
+        check('文档写的命令条数和实际一致', probs5.length === 0,
+          probs5.length ? probs5.slice(0, 2).join(' | ') : cmdCount + ' 条对上');
+      }
+
       // ⑦之四 行内反引号里提到的 node 脚本也要在
       //   为什么加（第 204 轮）：上面的 ⑦ 只扫【代码块】里的命令，
       //   而「跑 `node tools/foo.js`」这种写在行内反引号里的，它抓不到。
