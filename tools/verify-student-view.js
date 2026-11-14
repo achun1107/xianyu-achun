@@ -842,6 +842,48 @@ const check = (name, ok, detail) => {
       check('一句话输入能解析（分隔符 + 连写 + 城市表）', probs7.length === 0,
         probs7.length ? probs7.slice(0, 3).join(' | ') : nCity + ' 个城市 / 4 种分隔符 / 连写可切');
     }
+
+    // ⑨ 服务端 needed ←→ 前端 body() 字段契约
+    //   为什么加（第 202 轮）：服务端 `for (const k of needed) if (!body[k]) 400`，
+    //   前端 `if (!v) 请先填完整：k`。两边各写一份必填清单，改一边忘另一边
+    //   就会出现【前端放行、服务端 400】或【前端拦死、永远发不出去】。
+    //   第 200 轮踩过同源的坑：base 默认空串被前端必填拦下，而服务端根本不需要它。
+    //   这里核：服务端要的每个字段，前端 body() 必须发。
+    {
+      const srvSrc = fs.readFileSync(path.join(achun, 'tools', 'staff-ui', 'server.js'), 'utf8');
+      const uiSrc = fs.readFileSync(path.join(achun, 'tools', 'staff-ui', 'ui.html'), 'utf8');
+      const probs9 = [];
+      const needed = {};
+      const needLine = srvSrc.split(/\r?\n/).find((l) => l.includes('const needed'));
+      if (!needLine) probs9.push('服务端找不到 const needed');
+      else {
+        for (const m of needLine.matchAll(/(\w+):\s*\[([^\]]*)\]/g)) {
+          needed[m[1]] = [...m[2].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+        }
+      }
+      const bodies = {};
+      for (const m of uiSrc.matchAll(/if \(k === '(\w+)'\) return \{([^}]+)\};/g)) {
+        bodies[m[1]] = [...m[2].matchAll(/(\w+):/g)].map((x) => x[1]).filter((x) => x !== 'kind');
+      }
+      // publish 是多行，且 city/star 是【简写属性】——只匹配 `k:` 会漏掉它们
+      const mp = uiSrc.match(/if \(k === 'publish'\) \{[\s\S]*?return \{ kind: k, city, star,[\s\S]*?\};/);
+      if (mp) {
+        const keys = new Set(['city', 'star']);
+        for (const m of mp[0].matchAll(/(\w+):/g)) if (m[1] !== 'kind') keys.add(m[1]);
+        bodies.publish = [...keys];
+      }
+      // login 是内联发的（doLogin 里 JSON.stringify({kind:'login', store:name})）
+      if (/kind: 'login', store:/.test(uiSrc)) bodies.login = ['store'];
+
+      for (const [kind, req] of Object.entries(needed)) {
+        const sent = bodies[kind];
+        if (!sent) { probs9.push(kind + ' 前端没有发它的 body()'); continue; }
+        const miss = req.filter((r) => !sent.includes(r));
+        if (miss.length) probs9.push(kind + ' 前端没发必填的 ' + miss.join(','));
+      }
+      check('前端发的字段覆盖服务端必填', probs9.length === 0,
+        probs9.length ? probs9.slice(0, 3).join(' | ') : Object.keys(needed).length + ' 个动作全对上');
+    }
   }
 
   // ── ⑬ 学员独立入口文件 ──
