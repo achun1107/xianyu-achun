@@ -54,6 +54,9 @@ const SCRIPTS = [
   'tools/utf8-check.js', 'tools/verify-published.js',
   'tools/ad-review.js', 'tools/list-onsale.js', 'tools/probe-event-dup.js',
   'tools/probe-mtop-apis.js',
+  // 【第 196 轮补】install-config.js —— 一页说明 / DSH 任务书 / 速查三份文档都提到它，
+  //   但一直没进这个清单。无参跑 = 只打用法（exit 0），实测安全。
+  'tools/install-config.js',
 ];
 
 // 英文报错特征（学员看不懂的）
