@@ -1319,6 +1319,43 @@ const check = (name, ok, detail) => {
     }
   }
 
+  // ⑪ 文档里的【规模数字】要和源码对得上
+  //   为什么加（第 208 轮）：第205–207 连着三轮在修过时数字 ——
+  //   报告的自检项数、清单的项数、手册的组数/冒烟步数/脚本数，全是加检查时
+  //   忘了同步。回归127 和「清单项数」只守了其中两条，剩下的没人管。
+  //   这里一次性守：组数（数本文件的 console.log 组标题）和冒烟步数（数 smoke-test）。
+  {
+    const probs11 = [];
+    // ① 组数：本文件里 console.log('\n①…') 的组标题
+    //   ⚠️ 必须跳过注释行 —— 这条注释自己就含 `console.log('\n①`，
+    //   第 208 轮第一版没跳，把注释数成了组（21 → 22）。
+    const selfSrc = fs.readFileSync(__filename, 'utf8');
+    const nGroups = selfSrc.split(/\r?\n/).filter((l) => {
+      const s = l.trim();
+      if (s.startsWith('//') || s.startsWith('*') || s.startsWith('/*')) return false;
+      return /console\.log\('\\n/.test(l) && /[①-⑳]/.test(l);
+    }).length;
+
+    // 两份文档里该出现的地方
+    //   ⚠️ 只守组数 —— 冒烟步数那半撤掉了（第 205 轮同样的原因：
+    //   `smoke-test.js` 不在包里，check-refs 会报「引用了没发布的文件」）。
+    const docs = [
+      { rel: '管理员手册-分发包维护.md', group: /自检覆盖的\s*(\d+)\s*组/ },
+      { rel: '交付状态-2026-11-13.md', group: /自动自检：\s*(\d+)\s*项\s*\/\s*(\d+)\s*组/ },
+    ];
+    for (const d of docs) {
+      const p = path.join(achun, d.rel);
+      if (!fs.existsSync(p)) { probs11.push('找不到 ' + d.rel); continue; }
+      const rep = fs.readFileSync(p, 'utf8');
+      const m = rep.match(d.group);
+      if (!m) { probs11.push(d.rel + ' 里没找到组数'); continue; }
+      const declared = Number(m[2] !== undefined ? m[2] : m[1]);
+      if (declared !== nGroups) probs11.push(d.rel + ' 写 ' + declared + ' 组、实际 ' + nGroups);
+    }
+    check('文档里的组数和源码对得上', probs11.length === 0,
+      probs11.length ? probs11.slice(0, 3).join(' | ') : nGroups + ' 组');
+  }
+
   // ── ⑯ 汇总 ──
   // ⑩ 交付清单里写的「N 项自动检查」要和实际跑出来的数对得上
   //   为什么加（第 206 轮）：交付清单写的是「28 项」，实际早就53 了 ——
